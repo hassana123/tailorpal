@@ -273,11 +273,9 @@ const LoginPage = () => {
                   'Log In'
                 )}
               </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-lightBlue-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+              {/* <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-lightBlue-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div> */}
             </button>
-          </form>
-
-          {/* Sign Up Link */}
+            {/* Sign Up Link */}
           <div className="mt-8 text-center">
             <p className="text-gray-600">
               Don't have an account?{' '}
@@ -290,6 +288,9 @@ const LoginPage = () => {
             </p>
           </div>
 
+          </form>
+
+          
           {/* Forgot Password Placeholder */}
           <div className="mt-4 text-center">
             <button
