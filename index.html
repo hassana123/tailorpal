@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="TailorPal - Your Digital Tailoring Assistant. Streamline your tailoring business with smart customer management, order tracking, and automated reminders." />
+    <meta name="keywords" content="tailoring, fashion, Nigeria, customer management, order tracking, business management" />
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#9333ea" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="TailorPal" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="TailorPal" />
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16x16.png" />
+    
+    <!-- Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Microsoft Tiles -->
+    <meta name="msapplication-TileColor" content="#9333ea" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tailorpal.app/" />
+    <meta property="og:title" content="TailorPal - Your Digital Tailoring Assistant" />
+    <meta property="og:description" content="Streamline your tailoring business with smart customer management, order tracking, and automated reminders." />
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://tailorpal.app/" />
+    <meta property="twitter:title" content="TailorPal - Your Digital Tailoring Assistant" />
+    <meta property="twitter:description" content="Streamline your tailoring business with smart customer management, order tracking, and automated reminders." />
+    <meta property="twitter:image" content="/icons/icon-512x512.png" />
+    
+    <title>TailorPal - Your Digital Tailoring Assistant</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+    
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((registration) => {
+              console.log('SW registered: ', registration);
+            })
+            .catch((registrationError) => {
+              console.log('SW registration failed: ', registrationError);
+            });
+        });
+      }
+    </script>
+  </body>
+</html>
