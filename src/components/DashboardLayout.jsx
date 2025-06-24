@@ -8,6 +8,7 @@ import { logout } from '../store/slices/authSlice';
 const DashboardLayout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useSelector((state) => state.auth);
+  const { shop } = useSelector((state) => state.shop);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const location = useLocation();
@@ -119,13 +120,23 @@ const DashboardLayout = () => {
             </nav>
 
             {/* User Menu */}
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <div className="text-right hidden sm:block">
-                <p className="text-sm text-gray-600">Welcome back,</p>
-                <p className="font-semibold text-gray-900 truncate max-w-32">
+            <div className="flex items-center">
+              {/* User Profile Badge */}
+              <div className="flex items-center mr-3 bg-gradient-to-r from-purple-50 to-pink-50 px-3 py-1.5 rounded-xl border border-purple-100">
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold mr-2">
+                  {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                </div>
+                <span className="font-medium text-gray-800 text-sm hidden sm:block truncate max-w-[120px]">
                   {user?.displayName || user?.email}
-                </p>
+                </span>
+                {shop && (
+                  <span className="ml-2 text-xs bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-full hidden sm:block">
+                    {shop.shopName}
+                  </span>
+                )}
               </div>
+              
+              {/* Logout Button */}
               <button
                 onClick={handleLogout}
                 className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
@@ -157,6 +168,25 @@ const DashboardLayout = () => {
                 </span>
               </div>
               
+              {/* User Profile in Sidebar */}
+              <div className="mb-6 bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl border border-purple-100">
+                <div className="flex items-center">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold mr-3">
+                    {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      {user?.displayName || user?.email}
+                    </p>
+                    {shop && (
+                      <p className="text-xs text-purple-600">
+                        {shop.shopName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
               <nav className="space-y-2">
                 {navigationItems.map((item) => (
                   <button
@@ -177,14 +207,17 @@ const DashboardLayout = () => {
                 ))}
               </nav>
 
-              {/* Mobile User Info */}
+              {/* Logout Button in Sidebar */}
               <div className="mt-8 pt-6 border-t border-gray-200">
-                <div className="text-center">
-                  <p className="text-sm text-gray-600">Logged in as</p>
-                  <p className="font-semibold text-gray-900 truncate">
-                    {user?.displayName || user?.email}
-                  </p>
-                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300 shadow-lg flex items-center justify-center"
+                >
+                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Logout
+                </button>
               </div>
             </div>
           </div>
