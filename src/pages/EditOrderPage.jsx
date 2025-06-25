@@ -26,18 +26,21 @@ const EditOrderPage = () => {
   // Form data
   const [orderData, setOrderData] = useState({
     garmentType: '',
-    styleDescription: '',
     dueDate: '',
     price: '',
     amountPaid: '',
-    notes: '',
     status: 'pending'
   });
 
+  // Order measurements and materials
   const [orderMeasurements, setOrderMeasurements] = useState({});
   const [customMeasurements, setCustomMeasurements] = useState({});
   const [customerMeasurements, setCustomerMeasurements] = useState({});
   const [materials, setMaterials] = useState([]);
+
+  // Style reference (moved to end)
+  const [styleDescription, setStyleDescription] = useState('');
+  const [notes, setNotes] = useState('');
 
   // Image upload state
   const [newStyleImage, setNewStyleImage] = useState(null);
@@ -110,13 +113,13 @@ const EditOrderPage = () => {
         // Initialize form data
         setOrderData({
           garmentType: orderInfo.garmentType || '',
-          styleDescription: orderInfo.styleDescription || '',
           dueDate: orderInfo.dueDate || '',
           price: orderInfo.price?.toString() || '',
           amountPaid: orderInfo.amountPaid?.toString() || '',
-          notes: orderInfo.notes || '',
           status: orderInfo.status || 'pending'
         });
+        setStyleDescription(orderInfo.styleDescription || '');
+        setNotes(orderInfo.notes || '');
 
         // Load order measurements
         try {
@@ -252,7 +255,7 @@ const EditOrderPage = () => {
   // Calculate total material cost
   const calculateTotalMaterialCost = () => {
     return materials.reduce((total, material) => {
-      return total + (material.quantity * material.unitCost);
+      return total + (material.totalCost || 0);
     }, 0);
   };
 
@@ -324,12 +327,12 @@ const EditOrderPage = () => {
       // Prepare updated data
       const updatedData = {
         garmentType: orderData.garmentType.trim(),
-        styleDescription: orderData.styleDescription.trim(),
+        styleDescription: styleDescription.trim(),
         dueDate: orderData.dueDate,
         price: parseFloat(orderData.price),
         amountPaid: parseFloat(orderData.amountPaid) || 0,
         balance: calculateBalance(),
-        notes: orderData.notes.trim(),
+        notes: notes.trim(),
         status: orderData.status,
         styleImageURL: newImageURL,
         updatedAt: new Date().toISOString()
@@ -657,94 +660,6 @@ const EditOrderPage = () => {
             </div>
           </div>
         </div>
-
-        {/* Style Reference */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Style Reference</h3>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Style Image */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Style Image</label>
-              
-              {/* Current Image */}
-              {(order.styleImageURL || newStyleImagePreview) && (
-                <div className="mb-4">
-                  <img
-                    src={newStyleImagePreview || order.styleImageURL}
-                    alt="Style reference"
-                    className="w-full h-48 object-cover rounded-xl border border-gray-200 shadow-lg"
-                  />
-                  {newStyleImagePreview && (
-                    <div className="mt-2 flex justify-center">
-                      <button
-                        type="button"
-                        onClick={clearNewStyleImage}
-                        className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors duration-200"
-                      >
-                        Remove new image
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Upload New Image */}
-              <div className="border-2 border-dashed border-purple-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50 transition-all duration-300">
-                <input
-                  id="newStyleImageInput"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleStyleImageChange}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div className="space-y-2">
-                  <svg className="w-12 h-12 text-purple-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <div>
-                    <p className="text-purple-600 font-medium">
-                      {order.styleImageURL ? 'Upload new style image' : 'Upload style image'}
-                    </p>
-                    <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Style Description */}
-            <div>
-              <label htmlFor="styleDescription" className="block text-sm font-semibold text-gray-700 mb-2">
-                Style Description
-              </label>
-              <textarea
-                id="styleDescription"
-                name="styleDescription"
-                value={orderData.styleDescription}
-                onChange={handleInputChange}
-                rows={6}
-                className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 resize-none"
-                placeholder="Describe the style details..."
-              />
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="mt-6">
-            <label htmlFor="notes" className="block text-sm font-semibold text-gray-700 mb-2">
-              Additional Notes
-            </label>
-            <textarea
-              id="notes"
-              name="notes"
-              value={orderData.notes}
-              onChange={handleInputChange}
-              rows={3}
-              className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 resize-none"
-              placeholder="Any special instructions or notes..."
-            />
-          </div>
-        </div>
       </div>
 
       {/* Materials Management */}
@@ -773,6 +688,99 @@ const EditOrderPage = () => {
           onChange={setCustomMeasurements}
         />
       )}
+
+      {/* Style Reference Section (Moved to end) */}
+      <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-6 border border-pink-200">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+          <svg className="w-6 h-6 mr-3 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Style Reference
+        </h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Style Image */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-4">Style Image</h3>
+            
+            {/* Current Image */}
+            {(order.styleImageURL || newStyleImagePreview) && (
+              <div className="mb-4">
+                <img
+                  src={newStyleImagePreview || order.styleImageURL}
+                  alt="Style reference"
+                  className="w-full h-48 object-cover rounded-xl border border-gray-200 shadow-lg"
+                />
+                {newStyleImagePreview && (
+                  <div className="mt-2 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={clearNewStyleImage}
+                      className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors duration-200"
+                    >
+                      Remove new image
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Upload New Image */}
+            <div className="border-2 border-dashed border-pink-300 rounded-xl p-6 text-center hover:border-pink-400 hover:bg-pink-50 transition-all duration-300">
+              <input
+                id="newStyleImageInput"
+                type="file"
+                accept="image/*"
+                onChange={handleStyleImageChange}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <div className="space-y-2">
+                <svg className="w-12 h-12 text-pink-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <div>
+                  <p className="text-pink-600 font-medium">
+                    {order.styleImageURL ? 'Upload new style image' : 'Upload style image'}
+                  </p>
+                  <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Style Description */}
+          <div>
+            <label htmlFor="styleDescription" className="block text-sm font-semibold text-gray-700 mb-2">
+              Style Description
+            </label>
+            <textarea
+              id="styleDescription"
+              value={styleDescription}
+              onChange={(e) => setStyleDescription(e.target.value)}
+              rows={6}
+              className="w-full px-4 py-3 bg-white border-2 border-pink-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-pink-500/20 focus:border-pink-500 transition-all duration-300 resize-none"
+              placeholder="Describe the style details..."
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Additional Notes Section (Moved to end) */}
+      <div className="bg-gradient-to-r from-gray-50 to-white rounded-2xl p-6 border border-gray-200">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+          <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          Additional Notes
+        </h2>
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={4}
+          className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-gray-500/20 focus:border-gray-500 transition-all duration-300 resize-none"
+          placeholder="Any special instructions or notes..."
+        />
+      </div>
     </div>
   );
 };
