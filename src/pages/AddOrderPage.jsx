@@ -17,85 +17,56 @@ import { db, storage } from '../firebase/config';
 import { addCustomer, setCustomers, setLoading as setCustomersLoading } from '../store/slices/customersSlice';
 import { addOrder, setLoading as setOrdersLoading } from '../store/slices/ordersSlice';
 
-// Nigerian tailoring measurement configurations
-const MEASUREMENT_CONFIGS = {
-  female: {
-    'boubou': {
-      name: 'Boubou',
-      measurements: ['bust', 'shoulder', 'boubouLength', 'sleeveLength']
-    },
-    'gown': {
-      name: 'Gown',
-      measurements: ['bust', 'waist', 'hip', 'shoulder', 'gownLength', 'sleeveLength']
-    },
-    'wrapper-blouse': {
-      name: 'Wrapper & Blouse',
-      measurements: ['bust', 'waist', 'hip', 'blouseLength', 'wrapperLength', 'sleeveLength']
-    },
-    'skirt-blouse': {
-      name: 'Skirt & Blouse',
-      measurements: ['bust', 'waist', 'hip', 'blouseLength', 'skirtLength', 'sleeveLength']
-    },
-    'trousers': {
-      name: 'Trousers',
-      measurements: ['waist', 'hip', 'thigh', 'trouserLength', 'lap']
-    },
-    'jumpsuit': {
-      name: 'Jumpsuit',
-      measurements: ['bust', 'waist', 'hip', 'shoulder', 'jumpsuitLength', 'sleeveLength']
-    }
-  },
-  male: {
-    'kaftan': {
-      name: 'Kaftan',
-      measurements: ['shoulder', 'chest', 'sleeveLength', 'kaftanLength']
-    },
-    'senator': {
-      name: 'Senator',
-      measurements: ['shoulder', 'chest', 'waist', 'sleeveLength', 'topLength', 'trouserLength']
-    },
-    'agbada': {
-      name: 'Agbada',
-      measurements: ['shoulder', 'chest', 'sleeveLength', 'agbadaLength', 'armholeCircumference']
-    },
-    'shirt-trousers': {
-      name: 'Shirt & Trousers',
-      measurements: ['shoulder', 'chest', 'waist', 'sleeveLength', 'shirtLength', 'trouserLength', 'lap']
-    },
-    'trousers': {
-      name: 'Trousers',
-      measurements: ['waist', 'hip', 'thigh', 'trouserLength', 'lap']
-    },
-    'dashiki': {
-      name: 'Dashiki',
-      measurements: ['shoulder', 'chest', 'sleeveLength', 'dashikiLength']
-    }
-  }
+// Default measurements for male customers
+const DEFAULT_MALE_MEASUREMENTS = {
+  agbadaLength: '',
+  topLength: '',
+  chest: '',
+  shoulder: '',
+  sleeveLength: '',
+  neck: '',
+  trouserLength: '',
+  waist: '',
+  hips: '',
+  thigh: '',
+  knee: '',
+  trouserMouth: ''
 };
 
-// Measurement field labels and units
+// Measurement field labels
 const MEASUREMENT_LABELS = {
-  bust: 'Bust',
-  waist: 'Waist',
-  hip: 'Hip',
-  shoulder: 'Shoulder',
-  chest: 'Chest',
-  thigh: 'Thigh',
-  lap: 'Lap',
-  sleeveLength: 'Sleeve Length',
-  gownLength: 'Gown Length',
-  boubouLength: 'Boubou Length',
-  kaftanLength: 'Kaftan Length',
   agbadaLength: 'Agbada Length',
-  dashikiLength: 'Dashiki Length',
   topLength: 'Top Length',
-  shirtLength: 'Shirt Length',
-  blouseLength: 'Blouse Length',
+  chest: 'Chest / Body',
+  shoulder: 'Shoulder',
+  sleeveLength: 'Sleeve Length',
+  neck: 'Neck',
   trouserLength: 'Trouser Length',
-  skirtLength: 'Skirt Length',
-  wrapperLength: 'Wrapper Length',
-  jumpsuitLength: 'Jumpsuit Length',
-  armholeCircumference: 'Armhole Circumference'
+  waist: 'Waist',
+  hips: 'Hips',
+  thigh: 'Thigh / Lap',
+  knee: 'Knee',
+  trouserMouth: 'Mouth / Trouser Mouth'
+};
+
+// Nigerian tailoring garment configurations
+const GARMENT_CONFIGS = {
+  female: {
+    'boubou': { name: 'Boubou' },
+    'gown': { name: 'Gown' },
+    'wrapper-blouse': { name: 'Wrapper & Blouse' },
+    'skirt-blouse': { name: 'Skirt & Blouse' },
+    'trousers': { name: 'Trousers' },
+    'jumpsuit': { name: 'Jumpsuit' }
+  },
+  male: {
+    'kaftan': { name: 'Kaftan' },
+    'senator': { name: 'Senator' },
+    'agbada': { name: 'Agbada' },
+    'shirt-trousers': { name: 'Shirt & Trousers' },
+    'trousers': { name: 'Trousers' },
+    'dashiki': { name: 'Dashiki' }
+  }
 };
 
 const AddOrderPage = () => {
@@ -133,8 +104,14 @@ const AddOrderPage = () => {
     notes: '',
   });
 
-  // Dynamic measurements based on gender and garment type
-  const [measurements, setMeasurements] = useState({});
+  // Default measurements for customer (if creating new customer)
+  const [defaultMeasurements, setDefaultMeasurements] = useState({});
+
+  // Customer's existing default measurements (if using existing customer)
+  const [customerDefaultMeasurements, setCustomerDefaultMeasurements] = useState({});
+
+  // Custom measurements for this specific order
+  const [customMeasurements, setCustomMeasurements] = useState([]);
 
   // Image upload state
   const [styleImage, setStyleImage] = useState(null);
@@ -195,22 +172,31 @@ const AddOrderPage = () => {
     loadCustomers();
   }, [user?.uid, shop, dispatch, preselectedCustomerId]);
 
-  // Update measurements when gender or garment type changes
+  // Initialize default measurements when gender changes (for new customers)
   useEffect(() => {
-    const gender = selectedCustomer?.gender || customerData.gender;
-    if (gender && orderData.garmentType) {
-      const config = MEASUREMENT_CONFIGS[gender]?.[orderData.garmentType];
-      if (config) {
-        const newMeasurements = {};
-        config.measurements.forEach(field => {
-          newMeasurements[field] = measurements[field] || '';
-        });
-        setMeasurements(newMeasurements);
-      }
+    if (customerData.gender === 'male') {
+      setDefaultMeasurements(DEFAULT_MALE_MEASUREMENTS);
     } else {
-      setMeasurements({});
+      setDefaultMeasurements({});
     }
-  }, [selectedCustomer?.gender, customerData.gender, orderData.garmentType]);
+  }, [customerData.gender]);
+
+  // Load customer's default measurements when customer is selected
+  const loadCustomerMeasurements = async (customerId) => {
+    try {
+      const measurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'measurements', 'default');
+      const measurementsDoc = await getDoc(measurementsRef);
+      
+      if (measurementsDoc.exists()) {
+        setCustomerDefaultMeasurements(measurementsDoc.data());
+      } else {
+        setCustomerDefaultMeasurements({});
+      }
+    } catch (error) {
+      console.error('Error loading customer measurements:', error);
+      setCustomerDefaultMeasurements({});
+    }
+  };
 
   // Filter customers based on search
   const filteredCustomers = customers.filter(customer =>
@@ -227,7 +213,7 @@ const AddOrderPage = () => {
     }
   };
 
-  const selectCustomer = (customer) => {
+  const selectCustomer = async (customer) => {
     setSelectedCustomer(customer);
     setCustomerSearch(`${customer.fullName} (${customer.phone})`);
     setShowCustomerForm(false);
@@ -237,12 +223,16 @@ const AddOrderPage = () => {
       address: customer.address || '',
       gender: customer.gender || '',
     });
+    
+    // Load customer's default measurements
+    await loadCustomerMeasurements(customer.id);
+    
     // Reset garment type when customer changes
     setOrderData(prev => ({
       ...prev,
       garmentType: ''
     }));
-    setMeasurements({});
+    setCustomMeasurements([]);
   };
 
   const clearCustomerSelection = () => {
@@ -255,11 +245,12 @@ const AddOrderPage = () => {
       address: '',
       gender: '',
     });
+    setCustomerDefaultMeasurements({});
     setOrderData(prev => ({
       ...prev,
       garmentType: ''
     }));
-    setMeasurements({});
+    setCustomMeasurements([]);
   };
 
   // Handle form input changes
@@ -284,7 +275,7 @@ const AddOrderPage = () => {
         ...prev,
         garmentType: ''
       }));
-      setMeasurements({});
+      setCustomMeasurements([]);
     }
   };
 
@@ -304,12 +295,32 @@ const AddOrderPage = () => {
     }
   };
 
-  const handleMeasurementChange = (e) => {
+  const handleDefaultMeasurementChange = (e) => {
     const { name, value } = e.target;
-    setMeasurements(prev => ({
+    setDefaultMeasurements(prev => ({
       ...prev,
       [name]: value
     }));
+  };
+
+  // Handle custom measurements
+  const addCustomMeasurement = () => {
+    setCustomMeasurements(prev => [
+      ...prev,
+      { id: Date.now(), label: '', value: '' }
+    ]);
+  };
+
+  const updateCustomMeasurement = (id, field, value) => {
+    setCustomMeasurements(prev =>
+      prev.map(measurement =>
+        measurement.id === id ? { ...measurement, [field]: value } : measurement
+      )
+    );
+  };
+
+  const removeCustomMeasurement = (id) => {
+    setCustomMeasurements(prev => prev.filter(measurement => measurement.id !== id));
   };
 
   // Handle style image upload
@@ -528,6 +539,19 @@ const AddOrderPage = () => {
 
           await setDoc(customerRef, customerFirestoreData);
           dispatch(addCustomer(customerInfo));
+
+          // Save default measurements if any are provided for new male customers
+          if (customerData.gender === 'male' && Object.values(defaultMeasurements).some(val => val.trim() !== '')) {
+            const measurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'measurements', 'default');
+            const measurementsData = Object.fromEntries(
+              Object.entries(defaultMeasurements).map(([key, value]) => [key, parseFloat(value) || 0])
+            );
+            await setDoc(measurementsRef, {
+              ...measurementsData,
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp()
+            });
+          }
         }
       }
 
@@ -555,9 +579,6 @@ const AddOrderPage = () => {
         amountPaid: parseFloat(orderData.amountPaid) || 0,
         balance: calculateBalance(),
         notes: orderData.notes.trim(),
-        measurements: Object.fromEntries(
-          Object.entries(measurements).map(([key, value]) => [key, parseFloat(value) || 0])
-        ),
         status: 'pending',
         createdAt: serverTimestamp(),
       };
@@ -575,15 +596,33 @@ const AddOrderPage = () => {
         amountPaid: parseFloat(orderData.amountPaid) || 0,
         balance: calculateBalance(),
         notes: orderData.notes.trim(),
-        measurements: Object.fromEntries(
-          Object.entries(measurements).map(([key, value]) => [key, parseFloat(value) || 0])
-        ),
         status: 'pending',
         createdAt: new Date().toISOString(),
       };
 
       await setDoc(orderRef, orderFirestoreData);
       dispatch(addOrder(orderInfo));
+
+      // Save custom measurements for the order if any
+      if (customMeasurements.length > 0) {
+        const customMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'customMeasurements', 'data');
+        const customMeasurementsData = {};
+        customMeasurements.forEach((measurement, index) => {
+          if (measurement.label.trim() && measurement.value.trim()) {
+            customMeasurementsData[`custom_${index}`] = {
+              label: measurement.label.trim(),
+              value: parseFloat(measurement.value) || 0
+            };
+          }
+        });
+        
+        if (Object.keys(customMeasurementsData).length > 0) {
+          await setDoc(customMeasurementsRef, {
+            measurements: customMeasurementsData,
+            createdAt: serverTimestamp()
+          });
+        }
+      }
 
       // Redirect to customer details page
       navigate(`/customers/${customerId}`);
@@ -602,7 +641,7 @@ const AddOrderPage = () => {
   const getAvailableGarmentTypes = () => {
     const gender = selectedCustomer?.gender || customerData.gender;
     if (!gender) return [];
-    return Object.entries(MEASUREMENT_CONFIGS[gender] || {}).map(([key, config]) => ({
+    return Object.entries(GARMENT_CONFIGS[gender] || {}).map(([key, config]) => ({
       value: key,
       label: config.name
     }));
@@ -719,104 +758,166 @@ const AddOrderPage = () => {
                     </button>
                   )}
                 </div>
+
+                {/* Show customer's default measurements if they exist */}
+                {selectedCustomer.gender === 'male' && Object.keys(customerDefaultMeasurements).length > 0 && (
+                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      Default Measurements Available
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Reference</span>
+                    </h4>
+                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2 text-sm">
+                      {Object.entries(customerDefaultMeasurements).map(([key, value]) => (
+                        key !== 'createdAt' && key !== 'updatedAt' && value > 0 && (
+                          <div key={key} className="text-center bg-white rounded p-2">
+                            <div className="font-medium text-blue-900">{value}"</div>
+                            <div className="text-xs text-blue-600">{MEASUREMENT_LABELS[key] || key}</div>
+                          </div>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Customer Form (show only if no customer selected) */}
             {showCustomerForm && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="fullName" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Full Name *
-                  </label>
-                  <input
-                    type="text"
-                    id="fullName"
-                    name="fullName"
-                    value={customerData.fullName}
-                    onChange={handleCustomerChange}
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                      errors.fullName ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                    }`}
-                    placeholder="Enter customer's full name"
-                  />
-                  {errors.fullName && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.fullName}
-                    </p>
-                  )}
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Full Name *
+                    </label>
+                    <input
+                      type="text"
+                      id="fullName"
+                      name="fullName"
+                      value={customerData.fullName}
+                      onChange={handleCustomerChange}
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
+                        errors.fullName ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
+                      }`}
+                      placeholder="Enter customer's full name"
+                    />
+                    {errors.fullName && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.fullName}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Phone Number *
+                    </label>
+                    <input
+                      type="tel"
+                      id="phone"
+                      name="phone"
+                      value={customerData.phone}
+                      onChange={handleCustomerChange}
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
+                        errors.phone ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
+                      }`}
+                      placeholder="Enter phone number"
+                    />
+                    {errors.phone && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.phone}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="gender" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Gender *
+                    </label>
+                    <select
+                      id="gender"
+                      name="gender"
+                      value={customerData.gender}
+                      onChange={handleCustomerChange}
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
+                        errors.gender ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
+                      }`}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="female">Female</option>
+                      <option value="male">Male</option>
+                    </select>
+                    {errors.gender && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.gender}
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Address (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      id="address"
+                      name="address"
+                      value={customerData.address}
+                      onChange={handleCustomerChange}
+                      className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300"
+                      placeholder="Enter customer's address"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    value={customerData.phone}
-                    onChange={handleCustomerChange}
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                      errors.phone ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                    }`}
-                    placeholder="Enter phone number"
-                  />
-                  {errors.phone && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                {/* Default Measurements Section (for new Male customers) */}
+                {customerData.gender === 'male' && (
+                  <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
-                      {errors.phone}
+                      General Body Measurements (inches)
+                      <span className="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Default</span>
+                    </h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                      These will be saved as default measurements for this customer.
                     </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="gender" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Gender *
-                  </label>
-                  <select
-                    id="gender"
-                    name="gender"
-                    value={customerData.gender}
-                    onChange={handleCustomerChange}
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                      errors.gender ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                    }`}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="female">Female</option>
-                    <option value="male">Male</option>
-                  </select>
-                  {errors.gender && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.gender}
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Address (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    id="address"
-                    name="address"
-                    value={customerData.address}
-                    onChange={handleCustomerChange}
-                    className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300"
-                    placeholder="Enter customer's address"
-                  />
-                </div>
-              </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {Object.keys(DEFAULT_MALE_MEASUREMENTS).map((measurementKey) => (
+                        <div key={measurementKey}>
+                          <label htmlFor={measurementKey} className="block text-sm font-semibold text-gray-700 mb-2">
+                            {MEASUREMENT_LABELS[measurementKey]}
+                          </label>
+                          <input
+                            type="number"
+                            id={measurementKey}
+                            name={measurementKey}
+                            value={defaultMeasurements[measurementKey] || ''}
+                            onChange={handleDefaultMeasurementChange}
+                            min="0"
+                            step="0.5"
+                            className="w-full px-3 py-2 bg-white border-2 border-blue-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300"
+                            placeholder="0"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1058,6 +1159,77 @@ const AddOrderPage = () => {
               </div>
             </div>
 
+            {/* Custom Measurements for Order */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Order-Specific Adjustments
+                  <span className="ml-2 text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded-full">Custom</span>
+                </h3>
+                <button
+                  type="button"
+                  onClick={addCustomMeasurement}
+                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center"
+                >
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Custom Field
+                </button>
+              </div>
+
+              {customMeasurements.length > 0 && (
+                <div className="space-y-4">
+                  {customMeasurements.map((measurement) => (
+                    <div key={measurement.id} className="flex items-center space-x-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={measurement.label}
+                          onChange={(e) => updateCustomMeasurement(measurement.id, 'label', e.target.value)}
+                          className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
+                          placeholder="Measurement name (e.g., Sleeve Slant)"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <input
+                          type="number"
+                          value={measurement.value}
+                          onChange={(e) => updateCustomMeasurement(measurement.id, 'value', e.target.value)}
+                          min="0"
+                          step="0.5"
+                          className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
+                          placeholder="0"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeCustomMeasurement(measurement.id)}
+                        className="text-red-500 hover:text-red-700 transition-colors duration-200"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {customMeasurements.length === 0 && (
+                <div className="text-center py-6 text-gray-500 bg-orange-50 rounded-xl border border-orange-200">
+                  <svg className="w-12 h-12 text-orange-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  <p className="text-sm">No custom measurements added yet</p>
+                  <p className="text-xs text-gray-400 mt-1">Click "Add Custom Field" to add order-specific measurements</p>
+                </div>
+              )}
+            </div>
+
             {/* Notes */}
             <div className="mt-6">
               <label htmlFor="notes" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1074,39 +1246,6 @@ const AddOrderPage = () => {
               />
             </div>
           </div>
-
-          {/* Dynamic Measurements Section */}
-          {(selectedCustomer?.gender || customerData.gender) && orderData.garmentType && Object.keys(measurements).length > 0 && (
-            <div className="bg-gradient-to-r from-cream-50 to-orange-50 rounded-2xl p-6 border border-cream-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <svg className="w-6 h-6 mr-3 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-                Measurements for {MEASUREMENT_CONFIGS[selectedCustomer?.gender || customerData.gender][orderData.garmentType]?.name} (inches)
-              </h2>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {Object.keys(measurements).map((measurementKey) => (
-                  <div key={measurementKey}>
-                    <label htmlFor={measurementKey} className="block text-sm font-semibold text-gray-700 mb-2">
-                      {MEASUREMENT_LABELS[measurementKey] || measurementKey}
-                    </label>
-                    <input
-                      type="number"
-                      id={measurementKey}
-                      name={measurementKey}
-                      value={measurements[measurementKey]}
-                      onChange={handleMeasurementChange}
-                      min="0"
-                      step="0.5"
-                      className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
-                      placeholder="0"
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Submit Button */}
           <div className="flex justify-center">
