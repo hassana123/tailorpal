@@ -15,58 +15,14 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase/config';
 import { addCustomer, setCustomers, setLoading as setCustomersLoading } from '../store/slices/customersSlice';
 import { addOrder, setLoading as setOrdersLoading } from '../store/slices/ordersSlice';
-
-// Default measurements for male customers
-const DEFAULT_MALE_MEASUREMENTS = {
-  agbadaLength: '',
-  topLength: '',
-  chest: '',
-  shoulder: '',
-  sleeveLength: '',
-  neck: '',
-  trouserLength: '',
-  waist: '',
-  hips: '',
-  thigh: '',
-  knee: '',
-  trouserMouth: ''
-};
-
-// Measurement field labels
-const MEASUREMENT_LABELS = {
-  agbadaLength: 'Agbada Length',
-  topLength: 'Top Length',
-  chest: 'Chest / Body',
-  shoulder: 'Shoulder',
-  sleeveLength: 'Sleeve Length',
-  neck: 'Neck',
-  trouserLength: 'Trouser Length',
-  waist: 'Waist',
-  hips: 'Hips',
-  thigh: 'Thigh / Lap',
-  knee: 'Knee',
-  trouserMouth: 'Mouth / Trouser Mouth'
-};
-
-// Nigerian tailoring garment configurations
-const GARMENT_CONFIGS = {
-  female: {
-    'boubou': { name: 'Boubou' },
-    'gown': { name: 'Gown' },
-    'wrapper-blouse': { name: 'Wrapper & Blouse' },
-    'skirt-blouse': { name: 'Skirt & Blouse' },
-    'trousers': { name: 'Trousers' },
-    'jumpsuit': { name: 'Jumpsuit' }
-  },
-  male: {
-    'kaftan': { name: 'Kaftan' },
-    'senator': { name: 'Senator' },
-    'agbada': { name: 'Agbada' },
-    'shirt-trousers': { name: 'Shirt & Trousers' },
-    'trousers': { name: 'Trousers' },
-    'dashiki': { name: 'Dashiki' }
-  }
-};
+import MeasurementForm from '../components/MeasurementForm';
+import OrderMeasurementForm from '../components/OrderMeasurementForm';
+import CustomMeasurementForm from '../components/CustomMeasurementForm';
+import { 
+  initializeDefaultMeasurements, 
+  getGarmentTypesForGender,
+  extractOrderMeasurements 
+} from '../utils/measurementConfigs';
 
 const AddCustomerPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -78,7 +34,6 @@ const AddCustomerPage = () => {
   // Form state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showOrderSection, setShowOrderSection] = useState(false);
-  const [showMeasurements, setShowMeasurements] = useState(true);
 
   // Customer form data
   const [customerData, setCustomerData] = useState({
@@ -87,6 +42,9 @@ const AddCustomerPage = () => {
     address: '',
     gender: '',
   });
+
+  // Customer measurements
+  const [customerMeasurements, setCustomerMeasurements] = useState({});
 
   // Order form data
   const [orderData, setOrderData] = useState({
@@ -98,11 +56,9 @@ const AddCustomerPage = () => {
     notes: '',
   });
 
-  // Default measurements for customer
-  const [defaultMeasurements, setDefaultMeasurements] = useState({});
-
-  // Custom measurements for order
-  const [customMeasurements, setCustomMeasurements] = useState([]);
+  // Order measurements
+  const [orderMeasurements, setOrderMeasurements] = useState({});
+  const [customMeasurements, setCustomMeasurements] = useState({});
 
   // Image upload state
   const [styleImage, setStyleImage] = useState(null);
@@ -157,10 +113,18 @@ const AddCustomerPage = () => {
 
   // Initialize default measurements when gender changes
   useEffect(() => {
-    if (customerData.gender === 'male') {
-      setDefaultMeasurements(DEFAULT_MALE_MEASUREMENTS);
+    if (customerData.gender) {
+      const defaultMeasurements = initializeDefaultMeasurements(customerData.gender);
+      setCustomerMeasurements(defaultMeasurements);
+      
+      // Reset order data when gender changes
+      setOrderData(prev => ({
+        ...prev,
+        garmentType: ''
+      }));
+      setOrderMeasurements({});
     } else {
-      setDefaultMeasurements({});
+      setCustomerMeasurements({});
     }
   }, [customerData.gender]);
 
@@ -179,14 +143,6 @@ const AddCustomerPage = () => {
         [name]: ''
       }));
     }
-
-    // Reset garment type if gender changes
-    if (name === 'gender') {
-      setOrderData(prev => ({
-        ...prev,
-        garmentType: ''
-      }));
-    }
   };
 
   const handleOrderChange = (e) => {
@@ -203,34 +159,6 @@ const AddCustomerPage = () => {
         [name]: ''
       }));
     }
-  };
-
-  const handleDefaultMeasurementChange = (e) => {
-    const { name, value } = e.target;
-    setDefaultMeasurements(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle custom measurements
-  const addCustomMeasurement = () => {
-    setCustomMeasurements(prev => [
-      ...prev,
-      { id: Date.now(), label: '', value: '' }
-    ]);
-  };
-
-  const updateCustomMeasurement = (id, field, value) => {
-    setCustomMeasurements(prev =>
-      prev.map(measurement =>
-        measurement.id === id ? { ...measurement, [field]: value } : measurement
-      )
-    );
-  };
-
-  const removeCustomMeasurement = (id) => {
-    setCustomMeasurements(prev => prev.filter(measurement => measurement.id !== id));
   };
 
   // Handle style image upload
@@ -437,20 +365,14 @@ const AddCustomerPage = () => {
       };
 
       await setDoc(customerRef, customerFirestoreData);
-      dispatch(addCustomer(customerInfo));
 
-      // Save default measurements if any are provided
-      if (customerData.gender === 'male' && Object.values(defaultMeasurements).some(val => val.trim() !== '')) {
+      // Save customer measurements
+      if (Object.keys(customerMeasurements).length > 0) {
         const measurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'measurements', 'default');
-        const measurementsData = Object.fromEntries(
-          Object.entries(defaultMeasurements).map(([key, value]) => [key, parseFloat(value) || 0])
-        );
-        await setDoc(measurementsRef, {
-          ...measurementsData,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        });
+        await setDoc(measurementsRef, customerMeasurements);
       }
+
+      dispatch(addCustomer(customerInfo));
 
       // Create order if order section is shown
       if (showOrderSection) {
@@ -499,28 +421,20 @@ const AddCustomerPage = () => {
         };
 
         await setDoc(orderRef, orderFirestoreData);
-        dispatch(addOrder(orderInfo));
 
-        // Save custom measurements for the order if any
-        if (customMeasurements.length > 0) {
-          const customMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'customMeasurements', 'data');
-          const customMeasurementsData = {};
-          customMeasurements.forEach((measurement, index) => {
-            if (measurement.label.trim() && measurement.value.trim()) {
-              customMeasurementsData[`custom_${index}`] = {
-                label: measurement.label.trim(),
-                value: parseFloat(measurement.value) || 0
-              };
-            }
-          });
-          
-          if (Object.keys(customMeasurementsData).length > 0) {
-            await setDoc(customMeasurementsRef, {
-              measurements: customMeasurementsData,
-              createdAt: serverTimestamp()
-            });
-          }
+        // Save order measurements
+        if (Object.keys(orderMeasurements).length > 0) {
+          const orderMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'measurements', 'default');
+          await setDoc(orderMeasurementsRef, orderMeasurements);
         }
+
+        // Save custom measurements
+        if (Object.keys(customMeasurements).length > 0) {
+          const customMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'customMeasurements', 'default');
+          await setDoc(customMeasurementsRef, customMeasurements);
+        }
+
+        dispatch(addOrder(orderInfo));
       }
 
       // Redirect to customer details page or customers list
@@ -545,14 +459,11 @@ const AddCustomerPage = () => {
   // Get available garment types based on selected gender
   const getAvailableGarmentTypes = () => {
     if (!customerData.gender) return [];
-    return Object.entries(GARMENT_CONFIGS[customerData.gender] || {}).map(([key, config]) => ({
-      value: key,
-      label: config.name
-    }));
+    return getGarmentTypesForGender(customerData.gender);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
       <div className="text-center">
         <div className="flex justify-center mb-6">
@@ -569,7 +480,7 @@ const AddCustomerPage = () => {
           </span>
         </h1>
         <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          Add a new customer to your tailoring business. You can optionally create their first order right away.
+          Add a new customer with their measurements and optionally create their first order.
         </p>
       </div>
 
@@ -696,63 +607,15 @@ const AddCustomerPage = () => {
             </div>
           </div>
 
-          {/* Default Measurements Section (for Male customers) */}
-          {customerData.gender === 'male' && (
-            <div className="bg-gradient-to-r from-blue-50 to-emerald-50 rounded-2xl p-6 border border-blue-200">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-                  <svg className="w-6 h-6 mr-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  General Body Measurements (inches)
-                  <span className="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Default</span>
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setShowMeasurements(!showMeasurements)}
-                  className="text-blue-600 hover:text-blue-800 transition-colors duration-200"
-                >
-                  {showMeasurements ? (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-
-              {showMeasurements && (
-                <>
-                  <p className="text-sm text-gray-600 mb-6">
-                    These are the standard body measurements for this customer. They can be used as defaults for all future orders.
-                  </p>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {Object.keys(DEFAULT_MALE_MEASUREMENTS).map((measurementKey) => (
-                      <div key={measurementKey}>
-                        <label htmlFor={measurementKey} className="block text-sm font-semibold text-gray-700 mb-2">
-                          {MEASUREMENT_LABELS[measurementKey]}
-                        </label>
-                        <input
-                          type="number"
-                          id={measurementKey}
-                          name={measurementKey}
-                          value={defaultMeasurements[measurementKey] || ''}
-                          onChange={handleDefaultMeasurementChange}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 bg-white border-2 border-blue-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300"
-                          placeholder="0"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+          {/* Customer Measurements Section */}
+          {customerData.gender && (
+            <MeasurementForm
+              gender={customerData.gender}
+              measurements={customerMeasurements}
+              onChange={setCustomerMeasurements}
+              isCollapsible={true}
+              title="Default Customer Measurements (Optional)"
+            />
           )}
 
           {/* Add Order Toggle */}
@@ -785,376 +648,296 @@ const AddCustomerPage = () => {
 
           {/* Order Details Section */}
           {showOrderSection && (
-            <div className="bg-gradient-to-r from-emerald-50 to-lightBlue-50 rounded-2xl p-6 border border-emerald-200">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-                <svg className="w-6 h-6 mr-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-                Order Details
-              </h2>
+            <>
+              <div className="bg-gradient-to-r from-emerald-50 to-lightBlue-50 rounded-2xl p-6 border border-emerald-200">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                  <svg className="w-6 h-6 mr-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                  Order Details
+                </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Garment Type */}
-                <div>
-                  <label htmlFor="garmentType" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Garment Type *
-                  </label>
-                  <select
-                    id="garmentType"
-                    name="garmentType"
-                    value={orderData.garmentType}
-                    onChange={handleOrderChange}
-                    disabled={!customerData.gender}
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                      errors.garmentType ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                    } ${!customerData.gender ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  >
-                    <option value="">
-                      {customerData.gender ? 'Select Garment Type' : 'Select Gender First'}
-                    </option>
-                    {getAvailableGarmentTypes().map(type => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Garment Type */}
+                  <div>
+                    <label htmlFor="garmentType" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Garment Type *
+                    </label>
+                    <select
+                      id="garmentType"
+                      name="garmentType"
+                      value={orderData.garmentType}
+                      onChange={handleOrderChange}
+                      disabled={!customerData.gender}
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
+                        errors.garmentType ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
+                      } ${!customerData.gender ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <option value="">
+                        {customerData.gender ? 'Select Garment Type' : 'Select Gender First'}
                       </option>
-                    ))}
-                  </select>
-                  {errors.garmentType && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.garmentType}
-                    </p>
-                  )}
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <label htmlFor="dueDate" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Due Date *
-                  </label>
-                  <input
-                    type="date"
-                    id="dueDate"
-                    name="dueDate"
-                    value={orderData.dueDate}
-                    onChange={handleOrderChange}
-                    min={new Date().toISOString().split('T')[0]}
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                      errors.dueDate ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                    }`}
-                  />
-                  {errors.dueDate && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.dueDate}
-                    </p>
-                  )}
-                </div>
-
-                {/* Price */}
-                <div>
-                  <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Price (₦) *
-                  </label>
-                  <input
-                    type="number"
-                    id="price"
-                    name="price"
-                    value={orderData.price}
-                    onChange={handleOrderChange}
-                    min="0"
-                    step="0.01"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                      errors.price ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                    }`}
-                    placeholder="Enter total price"
-                  />
-                  {errors.price && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.price}
-                    </p>
-                  )}
-                </div>
-
-                {/* Amount Paid */}
-                <div>
-                  <label htmlFor="amountPaid" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Amount Paid (₦)
-                  </label>
-                  <input
-                    type="number"
-                    id="amountPaid"
-                    name="amountPaid"
-                    value={orderData.amountPaid}
-                    onChange={handleOrderChange}
-                    min="0"
-                    step="0.01"
-                    className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                      errors.amountPaid ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                    }`}
-                    placeholder="Enter amount paid upfront"
-                  />
-                  {errors.amountPaid && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.amountPaid}
-                    </p>
-                  )}
-                </div>
-
-                {/* Balance Display */}
-                {orderData.price && (
-                  <div className="md:col-span-2">
-                    <div className="bg-gradient-to-r from-cream-50 to-orange-50 border border-cream-200 rounded-xl p-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-gray-700">Balance Remaining:</span>
-                        <span className="text-lg font-bold text-orange-600">
-                          ₦{calculateBalance().toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
+                      {getAvailableGarmentTypes().map(type => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.garmentType && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.garmentType}
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
 
-              {/* Style Reference */}
-              <div className="mt-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Style Reference
-                </label>
-
-                {/* Style Image Upload */}
-                <div className="mb-4">
-                  <div className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
-                    errors.styleImage ? 'border-red-300 bg-red-50' : 'border-emerald-300 hover:border-emerald-400 hover:bg-emerald-50'
-                  }`}>
+                  {/* Due Date */}
+                  <div>
+                    <label htmlFor="dueDate" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Due Date *
+                    </label>
                     <input
-                      id="styleImageInput"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleStyleImageChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      type="date"
+                      id="dueDate"
+                      name="dueDate"
+                      value={orderData.dueDate}
+                      onChange={handleOrderChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
+                        errors.dueDate ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
+                      }`}
                     />
-                    <div className="space-y-2">
-                      <svg className="w-12 h-12 text-emerald-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                      </svg>
-                      <div>
-                        <p className="text-emerald-600 font-medium">Click to upload style image</p>
-                        <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                      </div>
-                    </div>
+                    {errors.dueDate && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.dueDate}
+                      </p>
+                    )}
                   </div>
 
-                  {/* Image Preview */}
-                  {(styleImagePreview || imageLoading) && (
-                    <div className="mt-4 flex items-center justify-center">
-                      <div className="relative">
-                        {imageLoading ? (
-                          <div className="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200">
-                            <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                          </div>
-                        ) : styleImagePreview ? (
-                          <div className="relative bg-white p-2 rounded-xl shadow-lg border border-gray-200">
-                            <img
-                              src={styleImagePreview}
-                              alt="Style preview"
-                              className="w-32 h-32 object-cover rounded-lg"
-                            />
-                            <button
-                              type="button"
-                              onClick={clearStyleImage}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600 transition-colors duration-200 shadow-lg"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        ) : null}
+                  {/* Price */}
+                  <div>
+                    <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Price (₦) *
+                    </label>
+                    <input
+                      type="number"
+                      id="price"
+                      name="price"
+                      value={orderData.price}
+                      onChange={handleOrderChange}
+                      min="0"
+                      step="0.01"
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
+                        errors.price ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
+                      }`}
+                      placeholder="Enter total price"
+                    />
+                    {errors.price && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.price}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Amount Paid */}
+                  <div>
+                    <label htmlFor="amountPaid" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Amount Paid (₦)
+                    </label>
+                    <input
+                      type="number"
+                      id="amountPaid"
+                      name="amountPaid"
+                      value={orderData.amountPaid}
+                      onChange={handleOrderChange}
+                      min="0"
+                      step="0.01"
+                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
+                        errors.amountPaid ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
+                      }`}
+                      placeholder="Enter amount paid upfront"
+                    />
+                    {errors.amountPaid && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.amountPaid}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Balance Display */}
+                  {orderData.price && (
+                    <div className="md:col-span-2">
+                      <div className="bg-gradient-to-r from-cream-50 to-orange-50 border border-cream-200 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700">Balance Remaining:</span>
+                          <span className="text-lg font-bold text-orange-600">
+                            ₦{calculateBalance().toLocaleString()}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {errors.styleImage && (
-                    <p className="mt-2 text-sm text-red-600 flex items-center">
-                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {errors.styleImage}
-                    </p>
                   )}
                 </div>
 
-                {/* Style Description */}
-                <div>
+                {/* Style Reference */}
+                <div className="mt-6">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Style Reference
+                  </label>
+
+                  {/* Style Image Upload */}
+                  <div className="mb-4">
+                    <div className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
+                      errors.styleImage ? 'border-red-300 bg-red-50' : 'border-emerald-300 hover:border-emerald-400 hover:bg-emerald-50'
+                    }`}>
+                      <input
+                        id="styleImageInput"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleStyleImageChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div className="space-y-2">
+                        <svg className="w-12 h-12 text-emerald-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <div>
+                          <p className="text-emerald-600 font-medium">Click to upload style image</p>
+                          <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Image Preview */}
+                    {(styleImagePreview || imageLoading) && (
+                      <div className="mt-4 flex items-center justify-center">
+                        <div className="relative">
+                          {imageLoading ? (
+                            <div className="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200">
+                              <svg className="animate-spin h-8 w-8 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            </div>
+                          ) : styleImagePreview ? (
+                            <div className="relative bg-white p-2 rounded-xl shadow-lg border border-gray-200">
+                              <img
+                                src={styleImagePreview}
+                                alt="Style preview"
+                                className="w-32 h-32 object-cover rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                onClick={clearStyleImage}
+                                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600 transition-colors duration-200 shadow-lg"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )}
+
+                    {errors.styleImage && (
+                      <p className="mt-2 text-sm text-red-600 flex items-center">
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {errors.styleImage}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Style Description */}
+                  <div>
+                    <textarea
+                      id="styleDescription"
+                      name="styleDescription"
+                      value={orderData.styleDescription}
+                      onChange={handleOrderChange}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-white border-2 border-emerald-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 resize-none"
+                      placeholder="Describe the style details (e.g., High neck with bell sleeves, A-line cut, etc.)"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
+                <div className="mt-6">
+                  <label htmlFor="notes" className="block text-sm font-semibold text-gray-700 mb-2">
+                    Additional Notes (Optional)
+                  </label>
                   <textarea
-                    id="styleDescription"
-                    name="styleDescription"
-                    value={orderData.styleDescription}
+                    id="notes"
+                    name="notes"
+                    value={orderData.notes}
                     onChange={handleOrderChange}
-                    rows={3}
+                    rows={2}
                     className="w-full px-4 py-3 bg-white border-2 border-emerald-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 resize-none"
-                    placeholder="Describe the style details (e.g., High neck with bell sleeves, A-line cut, etc.)"
+                    placeholder="Any special instructions or notes for this order"
                   />
                 </div>
               </div>
 
-              {/* Custom Measurements for Order */}
-              <div className="mt-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Order-Specific Adjustments
-                    <span className="ml-2 text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded-full">Custom</span>
-                  </h3>
-                  <button
-                    type="button"
-                    onClick={addCustomMeasurement}
-                    className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center"
-                  >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add Custom Field
-                  </button>
-                </div>
-
-                {customMeasurements.length > 0 && (
-                  <div className="space-y-4">
-                    {customMeasurements.map((measurement) => (
-                      <div key={measurement.id} className="flex items-center space-x-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
-                        <div className="flex-1">
-                          <input
-                            type="text"
-                            value={measurement.label}
-                            onChange={(e) => updateCustomMeasurement(measurement.id, 'label', e.target.value)}
-                            className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
-                            placeholder="Measurement name (e.g., Sleeve Slant)"
-                          />
-                        </div>
-                        <div className="w-24">
-                          <input
-                            type="number"
-                            value={measurement.value}
-                            onChange={(e) => updateCustomMeasurement(measurement.id, 'value', e.target.value)}
-                            min="0"
-                            step="0.5"
-                            className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
-                            placeholder="0"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeCustomMeasurement(measurement.id)}
-                          className="text-red-500 hover:text-red-700 transition-colors duration-200"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {customMeasurements.length === 0 && (
-                  <div className="text-center py-6 text-gray-500 bg-orange-50 rounded-xl border border-orange-200">
-                    <svg className="w-12 h-12 text-orange-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <p className="text-sm">No custom measurements added yet</p>
-                    <p className="text-xs text-gray-400 mt-1">Click "Add Custom Field" to add order-specific measurements</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Notes */}
-              <div className="mt-6">
-                <label htmlFor="notes" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Additional Notes (Optional)
-                </label>
-                <textarea
-                  id="notes"
-                  name="notes"
-                  value={orderData.notes}
-                  onChange={handleOrderChange}
-                  rows={2}
-                  className="w-full px-4 py-3 bg-white border-2 border-emerald-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 resize-none"
-                  placeholder="Any special instructions or notes for this order"
+              {/* Order Measurements */}
+              {customerData.gender && orderData.garmentType && (
+                <OrderMeasurementForm
+                  gender={customerData.gender}
+                  garmentType={orderData.garmentType}
+                  customerMeasurements={customerMeasurements}
+                  orderMeasurements={orderMeasurements}
+                  onChange={setOrderMeasurements}
                 />
-              </div>
-            </div>
+              )}
+
+              {/* Custom Measurements */}
+              {customerData.gender && orderData.garmentType && (
+                <CustomMeasurementForm
+                  customMeasurements={customMeasurements}
+                  onChange={setCustomMeasurements}
+                />
+              )}
+            </>
           )}
 
           {/* Submit Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            {!showOrderSection && (
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="group relative bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <span className="relative z-10 flex items-center justify-center">
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving Customer...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Save Customer
-                    </>
-                  )}
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
-              </button>
-            )}
-
-            {showOrderSection && (
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="group relative bg-gradient-to-r from-purple-600 via-pink-600 to-lightBlue-600 hover:from-purple-700 hover:via-pink-700 hover:to-lightBlue-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-              >
-                <span className="relative z-10 flex items-center justify-center">
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Saving Customer & Order...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Save Customer & Order
-                    </>
-                  )}
-                </span>
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-lightBlue-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="group relative bg-gradient-to-r from-purple-600 via-pink-600 to-lightBlue-600 hover:from-purple-700 hover:via-pink-700 hover:to-lightBlue-700 text-white px-8 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              <span className="relative z-10 flex items-center justify-center">
+                {isSubmitting ? (
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    {showOrderSection ? 'Saving Customer & Order...' : 'Saving Customer...'}
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {showOrderSection ? 'Save Customer & Order' : 'Save Customer'}
+                  </>
+                )}
+              </span>
+              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-lightBlue-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
+            </button>
           </div>
         </form>
       </div>
