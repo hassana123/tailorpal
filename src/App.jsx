@@ -13,10 +13,13 @@ import DashboardPage from './pages/DashboardPage';
 import CreateShopPage from './pages/CreateShopPage';
 import AddOrderPage from './pages/AddOrderPage';
 import AddCustomerPage from './pages/AddCustomerPage';
+import EditCustomerPage from './pages/EditCustomerPage';
+import EditOrderPage from './pages/EditOrderPage';
 import CustomersPage from './pages/CustomersPage';
 import OrdersPage from './pages/OrdersPage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import InventoryPage from './pages/InventoryPage';
 import './index.css';
 
 // Auth Wrapper Component
@@ -48,9 +51,12 @@ function App() {
               <Route path="add-order" element={<AddOrderPage />} />
               <Route path="add-customer" element={<AddCustomerPage />} />
               <Route path="customers/:customerId" element={<CustomerDetailsPage />} />
+              <Route path="customers/:customerId/edit" element={<EditCustomerPage />} />
               <Route path="customers/:customerId/orders/:orderId" element={<OrderDetailsPage />} />
+              <Route path="customers/:customerId/orders/:orderId/edit" element={<EditOrderPage />} />
               <Route path="customers" element={<CustomersPage />} />
               <Route path="orders" element={<OrdersPage />} />
+              <Route path="inventory" element={<InventoryPage />} />
             </Route>
 
             {/* Create Shop Route - Protected but doesn't require shop */}

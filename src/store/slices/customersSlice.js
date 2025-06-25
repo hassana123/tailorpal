@@ -26,6 +26,10 @@ const customersSlice = createSlice({
       }
       state.error = null;
     },
+    deleteCustomer: (state, action) => {
+      state.customers = state.customers.filter(customer => customer.id !== action.payload);
+      state.error = null;
+    },
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
@@ -43,6 +47,7 @@ export const {
   setCustomers, 
   addCustomer, 
   updateCustomer, 
+  deleteCustomer,
   setLoading, 
   setError, 
   clearError 
