@@ -20,6 +20,7 @@ const OrderDetailsPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Helper function to safely convert Firebase Timestamp
   const convertTimestampToString = (timestamp) => {
@@ -118,10 +119,6 @@ const OrderDetailsPage = () => {
 
   // Handle delete order
   const handleDeleteOrder = async () => {
-    if (!window.confirm('Are you sure you want to delete this order? This action cannot be undone and will remove all related data including materials and measurements.')) {
-      return;
-    }
-
     try {
       setIsDeleting(true);
       
@@ -136,6 +133,7 @@ const OrderDetailsPage = () => {
     } catch (error) {
       console.error('Error deleting order:', error);
       setError('Failed to delete order. Please try again.');
+      setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }
@@ -220,6 +218,35 @@ const OrderDetailsPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 sm:space-y-8">
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold text-red-600 mb-4">Delete Order</h3>
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to delete this order for <span className="font-semibold">{customer.fullName}</span>? 
+              This will permanently remove the order and all related data including measurements and materials.
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteOrder}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -252,7 +279,7 @@ const OrderDetailsPage = () => {
             Edit Order
           </button>
           <button
-            onClick={handleDeleteOrder}
+            onClick={() => setShowDeleteConfirm(true)}
             disabled={isDeleting}
             className="bg-gradient-to-r from-red-600 to-pink-600 hover:from-red-700 hover:to-pink-700 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
@@ -370,62 +397,6 @@ const OrderDetailsPage = () => {
         </div>
       </div>
 
-      {/* Style Reference */}
-      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-purple-100">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-          <svg className="w-6 h-6 mr-3 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Style Reference
-        </h2>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Style Image */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Style Image</h3>
-            
-            {order.styleImageURL ? (
-              <img
-                src={order.styleImageURL}
-                alt="Style reference"
-                className="w-full h-64 object-cover rounded-xl border border-gray-200 shadow-lg"
-              />
-            ) : (
-              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-gray-200">
-                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p>No style image uploaded</p>
-              </div>
-            )}
-          </div>
-
-          {/* Style Description */}
-          <div>
-            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Style Description</h3>
-            <div className="bg-gray-50 rounded-xl p-4 min-h-[150px]">
-              {order.styleDescription ? (
-                <p className="text-gray-900 leading-relaxed">{order.styleDescription}</p>
-              ) : (
-                <p className="text-gray-500 italic">No style description provided</p>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div className="mt-6">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Additional Notes</h3>
-              <div className="bg-gray-50 rounded-xl p-4 min-h-[100px]">
-                {order.notes ? (
-                  <p className="text-gray-900 leading-relaxed">{order.notes}</p>
-                ) : (
-                  <p className="text-gray-500 italic">No additional notes</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Materials */}
       {materials.length > 0 && (
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-purple-100">
@@ -524,6 +495,62 @@ const OrderDetailsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Style Reference */}
+      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-purple-100">
+        <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+          <svg className="w-6 h-6 mr-3 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Style Reference
+        </h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Style Image */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Style Image</h3>
+            
+            {order.styleImageURL ? (
+              <img
+                src={order.styleImageURL}
+                alt="Style reference"
+                className="w-full h-64 object-cover rounded-xl border border-gray-200 shadow-lg"
+              />
+            ) : (
+              <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border border-gray-200">
+                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <p>No style image uploaded</p>
+              </div>
+            )}
+          </div>
+
+          {/* Style Description */}
+          <div>
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Style Description</h3>
+            <div className="bg-gray-50 rounded-xl p-4 min-h-[150px]">
+              {order.styleDescription ? (
+                <p className="text-gray-900 leading-relaxed">{order.styleDescription}</p>
+              ) : (
+                <p className="text-gray-500 italic">No style description provided</p>
+              )}
+            </div>
+
+            {/* Notes */}
+            <div className="mt-6">
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">Additional Notes</h3>
+              <div className="bg-gray-50 rounded-xl p-4 min-h-[100px]">
+                {order.notes ? (
+                  <p className="text-gray-900 leading-relaxed">{order.notes}</p>
+                ) : (
+                  <p className="text-gray-500 italic">No additional notes</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
