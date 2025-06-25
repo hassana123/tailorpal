@@ -16,58 +16,14 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase/config';
 import { addCustomer, setCustomers, setLoading as setCustomersLoading } from '../store/slices/customersSlice';
 import { addOrder, setLoading as setOrdersLoading } from '../store/slices/ordersSlice';
-
-// Default measurements for male customers
-const DEFAULT_MALE_MEASUREMENTS = {
-  agbadaLength: '',
-  topLength: '',
-  chest: '',
-  shoulder: '',
-  sleeveLength: '',
-  neck: '',
-  trouserLength: '',
-  waist: '',
-  hips: '',
-  thigh: '',
-  knee: '',
-  trouserMouth: ''
-};
-
-// Measurement field labels
-const MEASUREMENT_LABELS = {
-  agbadaLength: 'Agbada Length',
-  topLength: 'Top Length',
-  chest: 'Chest / Body',
-  shoulder: 'Shoulder',
-  sleeveLength: 'Sleeve Length',
-  neck: 'Neck',
-  trouserLength: 'Trouser Length',
-  waist: 'Waist',
-  hips: 'Hips',
-  thigh: 'Thigh / Lap',
-  knee: 'Knee',
-  trouserMouth: 'Mouth / Trouser Mouth'
-};
-
-// Nigerian tailoring garment configurations
-const GARMENT_CONFIGS = {
-  female: {
-    'boubou': { name: 'Boubou' },
-    'gown': { name: 'Gown' },
-    'wrapper-blouse': { name: 'Wrapper & Blouse' },
-    'skirt-blouse': { name: 'Skirt & Blouse' },
-    'trousers': { name: 'Trousers' },
-    'jumpsuit': { name: 'Jumpsuit' }
-  },
-  male: {
-    'kaftan': { name: 'Kaftan' },
-    'senator': { name: 'Senator' },
-    'agbada': { name: 'Agbada' },
-    'shirt-trousers': { name: 'Shirt & Trousers' },
-    'trousers': { name: 'Trousers' },
-    'dashiki': { name: 'Dashiki' }
-  }
-};
+import MeasurementForm from '../components/MeasurementForm';
+import OrderMeasurementForm from '../components/OrderMeasurementForm';
+import CustomMeasurementForm from '../components/CustomMeasurementForm';
+import { 
+  initializeDefaultMeasurements, 
+  getGarmentTypesForGender,
+  extractOrderMeasurements 
+} from '../utils/measurementConfigs';
 
 const AddOrderPage = () => {
   const { user } = useSelector((state) => state.auth);
@@ -94,6 +50,9 @@ const AddOrderPage = () => {
     gender: '',
   });
 
+  // Customer measurements
+  const [customerMeasurements, setCustomerMeasurements] = useState({});
+
   // Order form data
   const [orderData, setOrderData] = useState({
     garmentType: '',
@@ -104,14 +63,9 @@ const AddOrderPage = () => {
     notes: '',
   });
 
-  // Default measurements for customer (if creating new customer)
-  const [defaultMeasurements, setDefaultMeasurements] = useState({});
-
-  // Customer's existing default measurements (if using existing customer)
-  const [customerDefaultMeasurements, setCustomerDefaultMeasurements] = useState({});
-
-  // Custom measurements for this specific order
-  const [customMeasurements, setCustomMeasurements] = useState([]);
+  // Order measurements
+  const [orderMeasurements, setOrderMeasurements] = useState({});
+  const [customMeasurements, setCustomMeasurements] = useState({});
 
   // Image upload state
   const [styleImage, setStyleImage] = useState(null);
@@ -159,7 +113,7 @@ const AddOrderPage = () => {
         if (preselectedCustomerId) {
           const preselectedCustomer = customersData.find(c => c.id === preselectedCustomerId);
           if (preselectedCustomer) {
-            selectCustomer(preselectedCustomer);
+            await selectCustomer(preselectedCustomer);
           }
         }
       } catch (error) {
@@ -172,31 +126,14 @@ const AddOrderPage = () => {
     loadCustomers();
   }, [user?.uid, shop, dispatch, preselectedCustomerId]);
 
-  // Initialize default measurements when gender changes (for new customers)
+  // Initialize default measurements when gender changes
   useEffect(() => {
-    if (customerData.gender === 'male') {
-      setDefaultMeasurements(DEFAULT_MALE_MEASUREMENTS);
-    } else {
-      setDefaultMeasurements({});
+    const gender = selectedCustomer?.gender || customerData.gender;
+    if (gender && showCustomerForm) {
+      const defaultMeasurements = initializeDefaultMeasurements(gender);
+      setCustomerMeasurements(defaultMeasurements);
     }
-  }, [customerData.gender]);
-
-  // Load customer's default measurements when customer is selected
-  const loadCustomerMeasurements = async (customerId) => {
-    try {
-      const measurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'measurements', 'default');
-      const measurementsDoc = await getDoc(measurementsRef);
-      
-      if (measurementsDoc.exists()) {
-        setCustomerDefaultMeasurements(measurementsDoc.data());
-      } else {
-        setCustomerDefaultMeasurements({});
-      }
-    } catch (error) {
-      console.error('Error loading customer measurements:', error);
-      setCustomerDefaultMeasurements({});
-    }
-  };
+  }, [selectedCustomer?.gender, customerData.gender, showCustomerForm]);
 
   // Filter customers based on search
   const filteredCustomers = customers.filter(customer =>
@@ -223,16 +160,33 @@ const AddOrderPage = () => {
       address: customer.address || '',
       gender: customer.gender || '',
     });
-    
+
     // Load customer's default measurements
-    await loadCustomerMeasurements(customer.id);
-    
-    // Reset garment type when customer changes
+    try {
+      const measurementsRef = doc(db, 'shops', user.uid, 'customers', customer.id, 'measurements', 'default');
+      const measurementsDoc = await getDoc(measurementsRef);
+      
+      if (measurementsDoc.exists()) {
+        setCustomerMeasurements(measurementsDoc.data());
+      } else {
+        // Initialize with default structure if no measurements exist
+        const defaultMeasurements = initializeDefaultMeasurements(customer.gender);
+        setCustomerMeasurements(defaultMeasurements);
+      }
+    } catch (error) {
+      console.error('Error loading customer measurements:', error);
+      // Fallback to default measurements
+      const defaultMeasurements = initializeDefaultMeasurements(customer.gender);
+      setCustomerMeasurements(defaultMeasurements);
+    }
+
+    // Reset order data when customer changes
     setOrderData(prev => ({
       ...prev,
       garmentType: ''
     }));
-    setCustomMeasurements([]);
+    setOrderMeasurements({});
+    setCustomMeasurements({});
   };
 
   const clearCustomerSelection = () => {
@@ -245,12 +199,13 @@ const AddOrderPage = () => {
       address: '',
       gender: '',
     });
-    setCustomerDefaultMeasurements({});
+    setCustomerMeasurements({});
     setOrderData(prev => ({
       ...prev,
       garmentType: ''
     }));
-    setCustomMeasurements([]);
+    setOrderMeasurements({});
+    setCustomMeasurements({});
   };
 
   // Handle form input changes
@@ -275,7 +230,7 @@ const AddOrderPage = () => {
         ...prev,
         garmentType: ''
       }));
-      setCustomMeasurements([]);
+      setOrderMeasurements({});
     }
   };
 
@@ -293,34 +248,6 @@ const AddOrderPage = () => {
         [name]: ''
       }));
     }
-  };
-
-  const handleDefaultMeasurementChange = (e) => {
-    const { name, value } = e.target;
-    setDefaultMeasurements(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  // Handle custom measurements
-  const addCustomMeasurement = () => {
-    setCustomMeasurements(prev => [
-      ...prev,
-      { id: Date.now(), label: '', value: '' }
-    ]);
-  };
-
-  const updateCustomMeasurement = (id, field, value) => {
-    setCustomMeasurements(prev =>
-      prev.map(measurement =>
-        measurement.id === id ? { ...measurement, [field]: value } : measurement
-      )
-    );
-  };
-
-  const removeCustomMeasurement = (id) => {
-    setCustomMeasurements(prev => prev.filter(measurement => measurement.id !== id));
   };
 
   // Handle style image upload
@@ -538,20 +465,14 @@ const AddOrderPage = () => {
           };
 
           await setDoc(customerRef, customerFirestoreData);
-          dispatch(addCustomer(customerInfo));
 
-          // Save default measurements if any are provided for new male customers
-          if (customerData.gender === 'male' && Object.values(defaultMeasurements).some(val => val.trim() !== '')) {
+          // Save customer measurements if creating new customer
+          if (Object.keys(customerMeasurements).length > 0) {
             const measurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'measurements', 'default');
-            const measurementsData = Object.fromEntries(
-              Object.entries(defaultMeasurements).map(([key, value]) => [key, parseFloat(value) || 0])
-            );
-            await setDoc(measurementsRef, {
-              ...measurementsData,
-              createdAt: serverTimestamp(),
-              updatedAt: serverTimestamp()
-            });
+            await setDoc(measurementsRef, customerMeasurements);
           }
+
+          dispatch(addCustomer(customerInfo));
         }
       }
 
@@ -601,28 +522,20 @@ const AddOrderPage = () => {
       };
 
       await setDoc(orderRef, orderFirestoreData);
-      dispatch(addOrder(orderInfo));
 
-      // Save custom measurements for the order if any
-      if (customMeasurements.length > 0) {
-        const customMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'customMeasurements', 'data');
-        const customMeasurementsData = {};
-        customMeasurements.forEach((measurement, index) => {
-          if (measurement.label.trim() && measurement.value.trim()) {
-            customMeasurementsData[`custom_${index}`] = {
-              label: measurement.label.trim(),
-              value: parseFloat(measurement.value) || 0
-            };
-          }
-        });
-        
-        if (Object.keys(customMeasurementsData).length > 0) {
-          await setDoc(customMeasurementsRef, {
-            measurements: customMeasurementsData,
-            createdAt: serverTimestamp()
-          });
-        }
+      // Save order measurements
+      if (Object.keys(orderMeasurements).length > 0) {
+        const orderMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'measurements', 'default');
+        await setDoc(orderMeasurementsRef, orderMeasurements);
       }
+
+      // Save custom measurements
+      if (Object.keys(customMeasurements).length > 0) {
+        const customMeasurementsRef = doc(db, 'shops', user.uid, 'customers', customerId, 'orders', orderId, 'customMeasurements', 'default');
+        await setDoc(customMeasurementsRef, customMeasurements);
+      }
+
+      dispatch(addOrder(orderInfo));
 
       // Redirect to customer details page
       navigate(`/customers/${customerId}`);
@@ -641,14 +554,11 @@ const AddOrderPage = () => {
   const getAvailableGarmentTypes = () => {
     const gender = selectedCustomer?.gender || customerData.gender;
     if (!gender) return [];
-    return Object.entries(GARMENT_CONFIGS[gender] || {}).map(([key, config]) => ({
-      value: key,
-      label: config.name
-    }));
+    return getGarmentTypesForGender(gender);
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
       <div className="text-center">
         <div className="flex justify-center mb-6">
@@ -758,29 +668,6 @@ const AddOrderPage = () => {
                     </button>
                   )}
                 </div>
-
-                {/* Show customer's default measurements if they exist */}
-                {selectedCustomer.gender === 'male' && Object.keys(customerDefaultMeasurements).length > 0 && (
-                  <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <h4 className="font-semibold text-blue-800 mb-2 flex items-center">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      Default Measurements Available
-                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Reference</span>
-                    </h4>
-                    <div className="grid grid-cols-3 md:grid-cols-4 gap-2 text-sm">
-                      {Object.entries(customerDefaultMeasurements).map(([key, value]) => (
-                        key !== 'createdAt' && key !== 'updatedAt' && value > 0 && (
-                          <div key={key} className="text-center bg-white rounded p-2">
-                            <div className="font-medium text-blue-900">{value}"</div>
-                            <div className="text-xs text-blue-600">{MEASUREMENT_LABELS[key] || key}</div>
-                          </div>
-                        )
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -881,40 +768,16 @@ const AddOrderPage = () => {
                   </div>
                 </div>
 
-                {/* Default Measurements Section (for new Male customers) */}
-                {customerData.gender === 'male' && (
-                  <div className="mt-6 bg-blue-50 rounded-xl p-4 border border-blue-200">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                      <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                      General Body Measurements (inches)
-                      <span className="ml-2 text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">Default</span>
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-4">
-                      These will be saved as default measurements for this customer.
-                    </p>
-                    
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {Object.keys(DEFAULT_MALE_MEASUREMENTS).map((measurementKey) => (
-                        <div key={measurementKey}>
-                          <label htmlFor={measurementKey} className="block text-sm font-semibold text-gray-700 mb-2">
-                            {MEASUREMENT_LABELS[measurementKey]}
-                          </label>
-                          <input
-                            type="number"
-                            id={measurementKey}
-                            name={measurementKey}
-                            value={defaultMeasurements[measurementKey] || ''}
-                            onChange={handleDefaultMeasurementChange}
-                            min="0"
-                            step="0.5"
-                            className="w-full px-3 py-2 bg-white border-2 border-blue-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-300"
-                            placeholder="0"
-                          />
-                        </div>
-                      ))}
-                    </div>
+                {/* Customer Measurements for New Customer */}
+                {customerData.gender && (
+                  <div className="mt-6">
+                    <MeasurementForm
+                      gender={customerData.gender}
+                      measurements={customerMeasurements}
+                      onChange={setCustomerMeasurements}
+                      isCollapsible={true}
+                      title="Default Customer Measurements (Optional)"
+                    />
                   </div>
                 )}
               </>
@@ -1159,77 +1022,6 @@ const AddOrderPage = () => {
               </div>
             </div>
 
-            {/* Custom Measurements for Order */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Order-Specific Adjustments
-                  <span className="ml-2 text-sm bg-orange-100 text-orange-800 px-2 py-1 rounded-full">Custom</span>
-                </h3>
-                <button
-                  type="button"
-                  onClick={addCustomMeasurement}
-                  className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center"
-                >
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add Custom Field
-                </button>
-              </div>
-
-              {customMeasurements.length > 0 && (
-                <div className="space-y-4">
-                  {customMeasurements.map((measurement) => (
-                    <div key={measurement.id} className="flex items-center space-x-4 bg-orange-50 p-4 rounded-xl border border-orange-200">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          value={measurement.label}
-                          onChange={(e) => updateCustomMeasurement(measurement.id, 'label', e.target.value)}
-                          className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
-                          placeholder="Measurement name (e.g., Sleeve Slant)"
-                        />
-                      </div>
-                      <div className="w-24">
-                        <input
-                          type="number"
-                          value={measurement.value}
-                          onChange={(e) => updateCustomMeasurement(measurement.id, 'value', e.target.value)}
-                          min="0"
-                          step="0.5"
-                          className="w-full px-3 py-2 bg-white border-2 border-orange-200 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 transition-all duration-300"
-                          placeholder="0"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeCustomMeasurement(measurement.id)}
-                        className="text-red-500 hover:text-red-700 transition-colors duration-200"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {customMeasurements.length === 0 && (
-                <div className="text-center py-6 text-gray-500 bg-orange-50 rounded-xl border border-orange-200">
-                  <svg className="w-12 h-12 text-orange-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  <p className="text-sm">No custom measurements added yet</p>
-                  <p className="text-xs text-gray-400 mt-1">Click "Add Custom Field" to add order-specific measurements</p>
-                </div>
-              )}
-            </div>
-
             {/* Notes */}
             <div className="mt-6">
               <label htmlFor="notes" className="block text-sm font-semibold text-gray-700 mb-2">
@@ -1246,6 +1038,25 @@ const AddOrderPage = () => {
               />
             </div>
           </div>
+
+          {/* Order Measurements */}
+          {(selectedCustomer?.gender || customerData.gender) && orderData.garmentType && (
+            <OrderMeasurementForm
+              gender={selectedCustomer?.gender || customerData.gender}
+              garmentType={orderData.garmentType}
+              customerMeasurements={customerMeasurements}
+              orderMeasurements={orderMeasurements}
+              onChange={setOrderMeasurements}
+            />
+          )}
+
+          {/* Custom Measurements */}
+          {(selectedCustomer?.gender || customerData.gender) && orderData.garmentType && (
+            <CustomMeasurementForm
+              customMeasurements={customMeasurements}
+              onChange={setCustomMeasurements}
+            />
+          )}
 
           {/* Submit Button */}
           <div className="flex justify-center">
