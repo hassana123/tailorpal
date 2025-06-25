@@ -610,7 +610,7 @@ const AddOrderPage = () => {
       </div>
 
       {/* Main Form */}
-      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-purple-100">
+      <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl md:p-8 border border-purple-100">
         {/* General Error Message */}
         {errors.general && (
           <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl p-4 mb-6">
@@ -625,7 +625,7 @@ const AddOrderPage = () => {
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Customer Selection Section */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-200">
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl md:p-6 p-2 border border-purple-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
               <svg className="w-6 h-6 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -676,7 +676,7 @@ const AddOrderPage = () => {
 
             {/* Selected Customer Display */}
             {selectedCustomer && (
-              <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+              <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl md:p-4 p-2">
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-emerald-800">Selected Customer</h3>
