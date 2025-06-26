@@ -316,7 +316,7 @@ const OrdersPage = () => {
             {filteredOrders.map((order) => (
               <div
                 key={order.id}
-                onClick={() => navigate(`/customers/${order.customerId}`)}
+                onClick={() => navigate(`/customers/${order.customerId}/orders/${order.id}`)}
                 className="p-4 sm:p-6 hover:bg-purple-50 transition-colors duration-200 cursor-pointer"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
