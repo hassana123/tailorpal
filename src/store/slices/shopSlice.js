@@ -27,8 +27,13 @@ const shopSlice = createSlice({
       state.error = action.payload;
       state.isLoading = false;
     },
+    updateShop: (state, action) => {
+      if (state.shop) {
+        state.shop = { ...state.shop, ...action.payload };
+      }
+    },
   },
 });
 
-export const { setShop, clearShop, setLoading, setError } = shopSlice.actions;
+export const { setShop, clearShop, setLoading, setError, updateShop } = shopSlice.actions;
 export default shopSlice.reducer;

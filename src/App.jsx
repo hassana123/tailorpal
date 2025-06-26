@@ -20,6 +20,7 @@ import OrdersPage from './pages/OrdersPage';
 import CustomerDetailsPage from './pages/CustomerDetailsPage';
 import OrderDetailsPage from './pages/OrderDetailsPage';
 import InventoryPage from './pages/InventoryPage';
+import EditShopPage from './pages/EditShopPage';
 import './index.css';
 
 // Auth Wrapper Component
@@ -57,6 +58,7 @@ function App() {
               <Route path="customers" element={<CustomersPage />} />
               <Route path="orders" element={<OrdersPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="edit-shop" element={<EditShopPage />} />
             </Route>
 
             {/* Create Shop Route - Protected but doesn't require shop */}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { setCustomers } from '../store/slices/customersSlice';
 import { setOrders } from '../store/slices/ordersSlice';
@@ -50,6 +50,7 @@ const DashboardPage = () => {
 
   // Load dashboard data
   useEffect(() => {
+    let unsubscribeExpenses = null;
     const loadDashboardData = async () => {
       if (!user?.uid || !shop) return;
 
@@ -123,58 +124,55 @@ const DashboardPage = () => {
         dispatch(setOrders(allOrders));
         setRecentOrders(allOrders.slice(0, 5)); // Get 5 most recent orders
 
-        // Load shop expenses
-        try {
-          const expensesRef = collection(db, 'shops', user.uid, 'expenses');
-          const expensesSnapshot = await getDocs(expensesRef);
+        // Real-time shop expenses
+        const expensesRef = collection(db, 'shops', user.uid, 'expenses');
+        unsubscribeExpenses = onSnapshot(expensesRef, (expensesSnapshot) => {
           const expensesData = expensesSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
           setExpenses(expensesData);
-        } catch (error) {
-          console.error('Error loading expenses:', error);
-        }
 
-        // Calculate financial statistics
-        const totalRevenue = allOrders.reduce((sum, order) => sum + (order.price || 0), 0);
-        const totalPaid = allOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
-        const totalBalance = allOrders.reduce((sum, order) => sum + (order.balance || 0), 0);
-        const totalMaterialCost = allMaterials.reduce((sum, material) => sum + (material.totalCost || 0), 0);
-        const totalExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-        const totalProfit = totalRevenue - totalMaterialCost - totalExpenses;
+          // Calculate financial statistics
+          const totalRevenue = allOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+          const totalPaid = allOrders.reduce((sum, order) => sum + (order.amountPaid || 0), 0);
+          const totalBalance = allOrders.reduce((sum, order) => sum + (order.balance || 0), 0);
+          const totalMaterialCost = allMaterials.reduce((sum, material) => sum + (material.totalCost || 0), 0);
+          const totalExpenses = expensesData.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+          const totalProfit = totalRevenue - totalMaterialCost - totalExpenses;
 
-        // Calculate monthly stats
-        const thisMonth = new Date();
-        thisMonth.setDate(1);
-        thisMonth.setHours(0, 0, 0, 0);
+          // Calculate monthly stats
+          const thisMonth = new Date();
+          thisMonth.setDate(1);
+          thisMonth.setHours(0, 0, 0, 0);
 
-        const monthlyOrders = allOrders.filter(order => new Date(order.createdAt) >= thisMonth);
-        const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + (order.price || 0), 0);
-        
-        const monthlyExpenses = expenses.filter(expense => new Date(expense.date) >= thisMonth)
-          .reduce((sum, expense) => sum + (expense.amount || 0), 0);
-        
-        const monthlyMaterialCost = allMaterials
-          .filter(material => {
-            const order = allOrders.find(o => o.id === material.orderId);
-            return order && new Date(order.createdAt) >= thisMonth;
-          })
-          .reduce((sum, material) => sum + (material.totalCost || 0), 0);
-        
-        const monthlyProfit = monthlyRevenue - monthlyMaterialCost - monthlyExpenses;
+          const monthlyOrders = allOrders.filter(order => new Date(order.createdAt) >= thisMonth);
+          const monthlyRevenue = monthlyOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+          
+          const monthlyExpenses = expensesData.filter(expense => new Date(expense.date) >= thisMonth)
+            .reduce((sum, expense) => sum + (expense.amount || 0), 0);
+          
+          const monthlyMaterialCost = allMaterials
+            .filter(material => {
+              const order = allOrders.find(o => o.id === material.orderId);
+              return order && new Date(order.createdAt) >= thisMonth;
+            })
+            .reduce((sum, material) => sum + (material.totalCost || 0), 0);
+          
+          const monthlyProfit = monthlyRevenue - monthlyMaterialCost - monthlyExpenses;
 
-        setFinancialStats({
-          totalRevenue,
-          totalPaid,
-          totalBalance,
-          totalMaterialCost,
-          totalExpenses,
-          totalProfit,
-          monthlyRevenue,
-          monthlyExpenses,
-          monthlyMaterialCost,
-          monthlyProfit
+          setFinancialStats({
+            totalRevenue,
+            totalPaid,
+            totalBalance,
+            totalMaterialCost,
+            totalExpenses,
+            totalProfit,
+            monthlyRevenue,
+            monthlyExpenses,
+            monthlyMaterialCost,
+            monthlyProfit
+          });
         });
 
       } catch (error) {
@@ -185,6 +183,9 @@ const DashboardPage = () => {
     };
 
     loadDashboardData();
+    return () => {
+      if (unsubscribeExpenses) unsubscribeExpenses();
+    };
   }, [user?.uid, shop, dispatch]);
 
   const getOrderStats = () => {
@@ -559,7 +560,18 @@ const DashboardPage = () => {
       {shop && (
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl p-6 sm:p-8 border border-purple-100">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-0">Shop Information</h2>
+            <div className="flex items-center space-x-4 mb-4 sm:mb-0">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Shop Information</h2>
+              <button
+                onClick={() => navigate('/edit-shop')}
+                className="inline-flex items-center px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white text-sm font-semibold rounded-xl shadow transition-all duration-200 ml-2"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536M9 11l6 6M3 17.25V21h3.75l11.086-11.086a2.121 2.121 0 00-3-3L3 17.25z" />
+                </svg>
+                Edit
+              </button>
+            </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-emerald-500 rounded-full"></div>
               <span className="text-sm text-emerald-600 font-medium">Active</span>
