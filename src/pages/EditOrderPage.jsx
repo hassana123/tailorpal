@@ -726,26 +726,29 @@ const EditOrderPage = () => {
             )}
 
             {/* Upload New Image */}
-            <div className="border-2 border-dashed border-pink-300 rounded-xl p-6 text-center hover:border-pink-400 hover:bg-pink-50 transition-all duration-300">
-              <input
-                id="newStyleImageInput"
-                type="file"
-                accept="image/*"
-                onChange={handleStyleImageChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="space-y-2">
-                <svg className="w-12 h-12 text-pink-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <div>
-                  <p className="text-pink-600 font-medium">
-                    {order.styleImageURL ? 'Upload new style image' : 'Upload style image'}
-                  </p>
-                  <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                </div>
-              </div>
-            </div>
+            <label htmlFor="newStyleImageInput" className="cursor-pointer">
+  <div className="border-2 border-dashed border-pink-300 rounded-xl p-6 text-center hover:border-pink-400 hover:bg-pink-50 transition-all duration-300">
+    <input
+      id="newStyleImageInput"
+      type="file"
+      accept="image/*"
+      onChange={handleStyleImageChange}
+      className="hidden"
+    />
+    <div className="space-y-2">
+      <svg className="w-12 h-12 text-pink-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <div>
+        <p className="text-pink-600 font-medium">
+          {order.styleImageURL ? 'Upload new style image' : 'Upload style image'}
+        </p>
+        <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
+      </div>
+    </div>
+  </div>
+</label>
+
           </div>
 
           {/* Style Description */}
