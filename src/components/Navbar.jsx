@@ -29,6 +29,10 @@ const Navbar = () => {
                 TailorPal
               </span>
             </div>
+            <div className="flex items-center ml-3 space-x-2">
+              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Powered by</span>
+              <img src="/bolt.png" alt="Bolt Badge" className="w-12 h-12 rounded-full shadow border-2 border-yellow-400 bg-white object-contain" />
+            </div>
           </div>
 
           {/* Desktop Navigation */}

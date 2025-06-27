@@ -131,10 +131,10 @@ const Features = () => {
               
               <div className="text-center group">
                 <div className="w-16 h-16 bg-gradient-to-br from-cream-500 to-orange-500 rounded-2xl flex items-center justify-center text-white text-2xl mb-4 mx-auto group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  🌐
+                  🌍
                 </div>
-                <h4 className="font-semibold text-gray-900 mb-2">Works Offline</h4>
-                <p className="text-sm text-gray-600">No internet? No problem</p>
+                <h4 className="font-semibold text-gray-900 mb-2">Accessible Anywhere</h4>
+                <p className="text-sm text-gray-600">Access your business from any device, anytime, anywhere.</p>
               </div>
               
               <div className="text-center group">

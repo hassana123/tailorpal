@@ -197,7 +197,7 @@ const DashboardLayout = () => {
                 <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-semibold mr-2">
                   {user?.displayName?.charAt(0) || user?.email?.charAt(0) || 'U'}
                 </div>
-                <span className="font-medium text-gray-800 text-sm hidden sm:block truncate max-w-[120px]">
+                <span className="font-medium text-gray-800 text-sm hidden sm:block truncate max-w-[80px]">
                   {user?.displayName || user?.email}
                 </span>
                 {shop && (
