@@ -20,6 +20,15 @@ import MeasurementForm from '../components/MeasurementForm';
 import OrderMeasurementForm from '../components/OrderMeasurementForm';
 import CustomMeasurementForm from '../components/CustomMeasurementForm';
 import MaterialsForm from '../components/MaterialsForm';
+import {
+  AddOrderHeader,
+  CustomerSearchSection,
+  NewCustomerForm,
+  OrderDetailsForm,
+  StyleReferenceForm,
+  SubmitButton,
+  ErrorMessage
+} from '../components/addorder';
 import { 
   initializeDefaultMeasurements, 
   getGarmentTypesForGender,
@@ -68,7 +77,7 @@ const AddOrderPage = () => {
   const [customMeasurements, setCustomMeasurements] = useState({});
   const [materials, setMaterials] = useState([]);
 
-  // Style reference (moved to end)
+  // Style reference
   const [styleDescription, setStyleDescription] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -340,7 +349,7 @@ const AddOrderPage = () => {
 
     // Order validation
     if(!styleDescription){
-      newErrors.styleDescription = "Please Provide Description"
+      newErrors.styleDescription = "Please Provide Description";
     }
     if (!orderData.garmentType.trim()) {
       newErrors.garmentType = 'Garment type is required';
@@ -573,13 +582,6 @@ const AddOrderPage = () => {
     }
   };
 
-  // Get available garment types based on selected gender
-  const getAvailableGarmentTypes = () => {
-    const gender = selectedCustomer?.gender || customerData.gender;
-    if (!gender) return [];
-    return getGarmentTypesForGender(gender);
-  };
-
   const formatCurrency = (amount) => {
     return `₦${amount?.toLocaleString() || '0'}`;
   };
@@ -587,392 +589,60 @@ const AddOrderPage = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       {/* Header */}
-      <div className="text-center">
-        <div className="flex justify-center mb-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-purple-500 via-pink-500 to-lightBlue-500 rounded-3xl flex items-center justify-center shadow-lg">
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-          </div>
-        </div>
-        
-        <h1 className="text-4xl font-bold mb-4">
-          <span className="bg-gradient-to-r from-purple-600 via-pink-600 to-lightBlue-600 bg-clip-text text-transparent">
-            {selectedCustomer ? `Add Order for ${selectedCustomer.fullName}` : 'Add New Order'}
-          </span>
-        </h1>
-        <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-          {selectedCustomer 
-            ? `Create a new order for ${selectedCustomer.fullName}.`
-            : 'Create a new order for an existing customer or add a new customer with their first order.'
-          }
-        </p>
-      </div>
+      <AddOrderHeader selectedCustomer={selectedCustomer} />
 
       {/* Main Form */}
       <div className="bg-white/80 backdrop-blur-lg rounded-3xl shadow-2xl md:p-8 border border-purple-100">
         {/* General Error Message */}
-        {errors.general && (
-          <div className="bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-2xl p-4 mb-6">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-red-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <p className="text-red-700 text-sm font-medium">{errors.general}</p>
-            </div>
-          </div>
-        )}
+        <ErrorMessage error={errors.general} />
 
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Customer Selection Section */}
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 p-4 border border-purple-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <svg className="w-6 h-6 mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-              Customer Information
-            </h2>
+          <CustomerSearchSection
+            preselectedCustomerId={preselectedCustomerId}
+            customerSearch={customerSearch}
+            onCustomerSearch={handleCustomerSearch}
+            filteredCustomers={filteredCustomers}
+            selectedCustomer={selectedCustomer}
+            onSelectCustomer={selectCustomer}
+            onClearCustomerSelection={clearCustomerSelection}
+          />
 
-            {/* Customer Search */}
-            {!preselectedCustomerId && (
-              <div className="mb-6">
-                <label htmlFor="customerSearch" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Search Existing Customer (Optional)
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    id="customerSearch"
-                    value={customerSearch}
-                    onChange={(e) => handleCustomerSearch(e.target.value)}
-                    className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300"
-                    placeholder="Search by name or phone number..."
+          {/* Customer Form (show only if no customer selected) */}
+          {showCustomerForm && (
+            <>
+              <NewCustomerForm
+                customerData={customerData}
+                onChange={handleCustomerChange}
+                errors={errors}
+              />
+
+              {/* Customer Measurements for New Customer */}
+              {customerData.gender && (
+                <div className="mt-6">
+                  <MeasurementForm
+                    gender={customerData.gender}
+                    measurements={customerMeasurements}
+                    onChange={setCustomerMeasurements}
+                    isCollapsible={true}
+                    title="Default Customer Measurements (Optional)"
                   />
-                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-                    <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                </div>
-
-                {/* Customer Search Results */}
-                {customerSearch && !selectedCustomer && filteredCustomers.length > 0 && (
-                  <div className="mt-2 bg-white border border-purple-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                    {filteredCustomers.map((customer) => (
-                      <button
-                        key={customer.id}
-                        type="button"
-                        onClick={() => selectCustomer(customer)}
-                        className="w-full text-left px-4 py-3 hover:bg-purple-50 transition-colors duration-200 border-b border-gray-100 last:border-b-0"
-                      >
-                        <div className="font-medium text-gray-900">{customer.fullName}</div>
-                        <div className="text-sm text-gray-600">{customer.phone} • {customer.gender}</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Selected Customer Display */}
-            {selectedCustomer && (
-              <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl md:p-4 p-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-emerald-800">Selected Customer</h3>
-                    <p className="text-emerald-700">{selectedCustomer.fullName}</p>
-                    <p className="text-sm text-emerald-600">{selectedCustomer.phone} • {selectedCustomer.gender}</p>
-                  </div>
-                  {!preselectedCustomerId && (
-                    <button
-                      type="button"
-                      onClick={clearCustomerSelection}
-                      className="text-emerald-600 hover:text-emerald-800 transition-colors duration-200"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Customer Form (show only if no customer selected) */}
-            {showCustomerForm && (
-              <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label htmlFor="fullName" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Full Name *
-                    </label>
-                    <input
-                      type="text"
-                      id="fullName"
-                      name="fullName"
-                      value={customerData.fullName}
-                      onChange={handleCustomerChange}
-                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                        errors.fullName ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                      }`}
-                      placeholder="Enter customer's full name"
-                    />
-                    {errors.fullName && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {errors.fullName}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="phone" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      id="phone"
-                      name="phone"
-                      value={customerData.phone}
-                      onChange={handleCustomerChange}
-                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                        errors.phone ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                      }`}
-                      placeholder="Enter phone number"
-                    />
-                    {errors.phone && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {errors.phone}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="gender" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Gender *
-                    </label>
-                    <select
-                      id="gender"
-                      name="gender"
-                      value={customerData.gender}
-                      onChange={handleCustomerChange}
-                      className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300 ${
-                        errors.gender ? 'border-red-300 bg-red-50' : 'border-purple-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <option value="">Select Gender</option>
-                      <option value="female">Female</option>
-                      <option value="male">Male</option>
-                    </select>
-                    {errors.gender && (
-                      <p className="mt-2 text-sm text-red-600 flex items-center">
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {errors.gender}
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="address" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Address (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      id="address"
-                      name="address"
-                      value={customerData.address}
-                      onChange={handleCustomerChange}
-                      className="w-full px-4 py-3 bg-white border-2 border-purple-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-purple-500/20 focus:border-purple-500 transition-all duration-300"
-                      placeholder="Enter customer's address"
-                    />
-                  </div>
-                </div>
-
-                {/* Customer Measurements for New Customer */}
-                {customerData.gender && (
-                  <div className="mt-6">
-                    <MeasurementForm
-                      gender={customerData.gender}
-                      measurements={customerMeasurements}
-                      onChange={setCustomerMeasurements}
-                      isCollapsible={true}
-                      title="Default Customer Measurements (Optional)"
-                    />
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Order Details Section */}
-          <div className="bg-gradient-to-r from-emerald-50 to-lightBlue-50 rounded-2xl p-6 border border-emerald-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <svg className="w-6 h-6 mr-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-              </svg>
-              Order Details
-            </h2>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Garment Type */}
-              <div>
-                <label htmlFor="garmentType" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Garment Type *
-                </label>
-                <select
-                  id="garmentType"
-                  name="garmentType"
-                  value={orderData.garmentType}
-                  onChange={handleOrderChange}
-                  disabled={!selectedCustomer?.gender && !customerData.gender}
-                  className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                    errors.garmentType ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                  } ${!selectedCustomer?.gender && !customerData.gender ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <option value="">
-                    {selectedCustomer?.gender || customerData.gender ? 'Select Garment Type' : 'Select Gender First'}
-                  </option>
-                  {getAvailableGarmentTypes().map(type => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.garmentType && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {errors.garmentType}
-                  </p>
-                )}
-              </div>
-
-              {/* Due Date */}
-              <div>
-                <label htmlFor="dueDate" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Due Date *
-                </label>
-                <input
-                  type="date"
-                  id="dueDate"
-                  name="dueDate"
-                  value={orderData.dueDate}
-                  onChange={handleOrderChange}
-                  min={new Date().toISOString().split('T')[0]}
-                  className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                    errors.dueDate ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                  }`}
-                />
-                {errors.dueDate && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {errors.dueDate}
-                  </p>
-                )}
-              </div>
-
-              {/* Price */}
-              <div>
-                <label htmlFor="price" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Price (₦) *
-                </label>
-                <input
-                  type="number"
-                  id="price"
-                  name="price"
-                  value={orderData.price}
-                  onChange={handleOrderChange}
-                  min="0"
-                  step="0.01"
-                  className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                    errors.price ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                  }`}
-                  placeholder="Enter total price"
-                />
-                {errors.price && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {errors.price}
-                  </p>
-                )}
-              </div>
-
-              {/* Amount Paid */}
-              <div>
-                <label htmlFor="amountPaid" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Amount Paid (₦)
-                </label>
-                <input
-                  type="number"
-                  id="amountPaid"
-                  name="amountPaid"
-                  value={orderData.amountPaid}
-                  onChange={handleOrderChange}
-                  min="0"
-                  step="0.01"
-                  className={`w-full px-4 py-3 bg-white border-2 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all duration-300 ${
-                    errors.amountPaid ? 'border-red-300 bg-red-50' : 'border-emerald-200 hover:border-emerald-300'
-                  }`}
-                  placeholder="Enter amount paid upfront"
-                />
-                {errors.amountPaid && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {errors.amountPaid}
-                  </p>
-                )}
-              </div>
-
-              {/* Financial Summary */}
-              {orderData.price && (
-                <div className="md:col-span-2">
-                  <div className="bg-gradient-to-r from-cream-50 to-orange-50 border border-cream-200 rounded-xl p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3">Financial Summary</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div className="text-center">
-                        <p className="text-gray-600">Total Price</p>
-                        <p className="font-bold text-gray-900">{formatCurrency(parseFloat(orderData.price))}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-gray-600">Amount Paid</p>
-                        <p className="font-bold text-emerald-600">{formatCurrency(parseFloat(orderData.amountPaid) || 0)}</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-gray-600">Balance</p>
-                        <p className={`font-bold ${calculateBalance() > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {formatCurrency(calculateBalance())}
-                        </p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-gray-600">Material Cost</p>
-                        <p className="font-bold text-orange-600">{formatCurrency(calculateTotalMaterialCost())}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t border-cream-200 text-center">
-                      <p className="text-gray-600">Net Profit</p>
-                      <p className={`text-lg font-bold ${calculateNetProfit() > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        {formatCurrency(calculateNetProfit())}
-                      </p>
-                    </div>
-                  </div>
                 </div>
               )}
-            </div>
-          </div>
+            </>
+          )}
+
+          {/* Order Details Section */}
+          <OrderDetailsForm
+            orderData={orderData}
+            customerGender={selectedCustomer?.gender || customerData.gender}
+            onChange={handleOrderChange}
+            errors={errors}
+            formatCurrency={formatCurrency}
+            calculateBalance={calculateBalance}
+            calculateTotalMaterialCost={calculateTotalMaterialCost}
+            calculateNetProfit={calculateNetProfit}
+          />
 
           {/* Order Measurements */}
           {(selectedCustomer?.gender || customerData.gender) && orderData.garmentType && (
@@ -993,100 +663,21 @@ const AddOrderPage = () => {
             />
           )}
 
-          {/* Style Reference Section (Moved to end) */}
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl p-6 border border-pink-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <svg className="w-6 h-6 mr-3 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              Style Reference (Optional)
-            </h2>
+          {/* Style Reference Section */}
+          <StyleReferenceForm
+            styleDescription={styleDescription}
+            setStyleDescription={setStyleDescription}
+            notes={notes}
+            setNotes={setNotes}
+            styleImage={styleImage}
+            styleImagePreview={styleImagePreview}
+            imageLoading={imageLoading}
+            onImageChange={handleStyleImageChange}
+            onClearImage={clearStyleImage}
+            errors={errors}
+          />
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Style Image Upload */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Style Image (Optional)
-                </label>
-                <div className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
-                  errors.styleImage ? 'border-red-300 bg-red-50' : 'border-pink-300 hover:border-pink-400 hover:bg-pink-50'
-                }`}>
-                  <input
-                    id="styleImageInput"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleStyleImageChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="space-y-2">
-                    <svg className="w-12 h-12 text-pink-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <div>
-                      <p className="text-pink-600 font-medium">Click to upload style image</p>
-                      <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Image Preview */}
-                {(styleImagePreview || imageLoading) && (
-                  <div className="mt-4 flex items-center justify-center">
-                    <div className="relative">
-                      {imageLoading ? (
-                        <div className="w-32 h-32 bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200">
-                          <svg className="animate-spin h-8 w-8 text-pink-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                        </div>
-                      ) : styleImagePreview ? (
-                        <div className="relative bg-white p-2 rounded-xl shadow-lg border border-gray-200">
-                          <img
-                            src={styleImagePreview}
-                            alt="Style preview"
-                            className="w-32 h-32 object-cover rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={clearStyleImage}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-sm hover:bg-red-600 transition-colors duration-200 shadow-lg"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                )}
-
-                {errors.styleImage && (
-                  <p className="mt-2 text-sm text-red-600 flex items-center">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {errors.styleImage}
-                  </p>
-                )}
-              </div>
-
-              {/* Style Description */}
-              <div>
-                <label htmlFor="styleDescription" className="block text-sm font-semibold text-gray-700 mb-2">
-                  Style Description (Optional)
-                </label>
-                <textarea
-                  id="styleDescription"
-                  value={styleDescription}
-                  onChange={(e) => setStyleDescription(e.target.value)}
-                  rows={6}
-                  className="w-full px-4 py-3 bg-white border-2 border-pink-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-pink-500/20 focus:border-pink-500 transition-all duration-300 resize-none"
-                  placeholder="Describe the style details (e.g., High neck with bell sleeves, A-line cut, etc.)"
-                />
-              </div>
-            </div>
-          </div>
-{/* Materials Section */}
+          {/* Materials Section */}
           {(selectedCustomer?.gender || customerData.gender) && orderData.garmentType && (
             <MaterialsForm
               customerId="temp"
@@ -1095,52 +686,9 @@ const AddOrderPage = () => {
               onChange={setMaterials}
             />
           )}
-          {/* Additional Notes Section (Moved to end) */}
-          <div className="bg-gradient-to-r from-gray-50 to-white rounded-2xl p-6 border border-gray-200">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <svg className="w-6 h-6 mr-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              Additional Notes (Optional)
-            </h2>
-
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-gray-500/20 focus:border-gray-500 transition-all duration-300 resize-none"
-              placeholder="Any special instructions, preferences, or notes for this order..."
-            />
-          </div>
 
           {/* Submit Button */}
-          <div className="flex justify-center">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="group relative bg-gradient-to-r from-purple-600 via-pink-600 to-lightBlue-600 hover:from-purple-700 hover:via-pink-700 hover:to-lightBlue-700 text-white px-12 py-4 rounded-2xl text-lg font-semibold transition-all duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              <span className="relative z-10 flex items-center justify-center">
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Creating Order...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Save Order
-                  </>
-                )}
-              </span>
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 via-pink-400 to-lightBlue-400 rounded-2xl blur opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
-            </button>
-          </div>
+          <SubmitButton isSubmitting={isSubmitting} />
         </form>
       </div>
     </div>
